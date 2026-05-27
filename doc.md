@@ -47,3 +47,23 @@ Implement:
   File upload vulnerabilities
   API testing
   HTTP request smuggling
+
+flowchart TD
+    Client[Client] --> Server[GoShield HTTP Server]
+
+    Server --> Pipeline[WAF Middleware Pipeline]
+
+    Pipeline --> ReqID[Request ID / Logging Context]
+    ReqID --> ClientIP[Client IP Resolver]
+    ClientIP --> SizeLimit[Request Size Limit]
+    SizeLimit --> IPList[IP Allow / Block List]
+    IPList --> RateLimit[Rate Limiter]
+    RateLimit --> CORS[CORS / Host / Origin Checks]
+    CORS --> JWT[JWT Validator]
+    JWT --> Scanner[SQLi / XSS / Payload Scanner]
+    Scanner --> Proxy[Reverse Proxy]
+
+    Proxy --> Backend[Backend API]
+    Backend --> Proxy
+    Proxy --> Logger[Security Logger]
+    Logger --> Client

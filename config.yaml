@@ -1,3 +1,9 @@
+server:
+    listen_addr: ":8080"
+
+backend:
+    url: "http://localhost:8081"
+
 # GET, HEAD, OPTIONS => max body 0
 # POST, PUT, PATCH => allow body
 # DELETE => small body 64kb
@@ -50,3 +56,32 @@ rate_limits:
             capacity: 5
             refill_rate_per_second: 0.01
             key: user_or_ip
+
+jwt:
+    enabled: true
+    secret: "super-secret-key"
+    protected_routes:
+        - "/api/users"
+        - "/api/orders"
+    skip_routes:
+        - "/api/auth/login"
+        - "/api/auth/register"
+ip_lists:
+    allow:
+        - "127.0.0.1"
+    block:
+        - "10.0.0.5"
+scanner:
+    enabled: true
+    scan_query: true
+    scan_headers: true
+    scan_body: true
+cors:
+    enabled: true
+    allowed_origins:
+        - "https://example.com"
+    allowed_methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
