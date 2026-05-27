@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/go_shield/internal/config"
+	"github.com/baxromumarov/go_shield/internal/config"
 )
 
 const (
