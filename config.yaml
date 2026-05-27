@@ -2,8 +2,11 @@
 # POST, PUT, PATCH => allow body
 # DELETE => small body 64kb
 request_limits:
+
+    # default max body size for each route
     default_max_body_bytes: 1048576
 
+    # max body size for each routes
     methods:
         GET: 0
         HEAD: 0
@@ -13,6 +16,7 @@ request_limits:
         PUT: 2097152  # 2mb
         PATCH: 1048576  # 1mb
 
+    # we can give specific routes a different max body size
     routes:
         "/api/auth/login":
             max_body_bytes: 16384  # 16kb
