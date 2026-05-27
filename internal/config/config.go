@@ -1,3 +1,12 @@
+// Package config contains GoShield configuration models and YAML loading.
+//
+// This file is for translating config.yaml into strongly typed Go structs.
+// Every major GoShield component should receive its settings from this package
+// instead of hardcoding values.
+//
+// Plan: add validation here as the project grows, for example checking that
+// backend.url is valid, JWT secrets are present when JWT is enabled, and route
+// limits are not negative.
 package config
 
 import (
@@ -7,48 +16,118 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// Config is the root configuration for the whole GoShield process.
 type Config struct {
-	RequestLimits   RequestLimits   `yaml:"request_limits"`
-	RateLimitConfig RateLimitConfig `yaml:"rate_limits"`
-	JWT             JWTConfig       `yaml:"jwt"`
+	Server        ServerConfig      `yaml:"server"`
+	Backend       BackendConfig     `yaml:"backend"`
+	RequestLimits RequestLimits     `yaml:"request_limits"`
+	RateLimits    RateLimitConfig   `yaml:"rate_limits"`
+	JWT           JWTConfig         `yaml:"jwt"`
+	IPLists       IPListsConfig     `yaml:"ip_lists"`
+	Scanner       ScannerConfig     `yaml:"scanner"`
+	CORS          CORSConfig        `yaml:"cors"`
+	Logging       SecurityLogConfig `yaml:"logging"`
 }
 
-type JWTConfig struct {
-	Secret string `yaml:"secret"`
+// ServerConfig controls the public GoShield HTTP server.
+type ServerConfig struct {
+	ListenAddr string `yaml:"listen_addr"`
 }
 
+// BackendConfig controls the upstream API that GoShield proxies to.
+type BackendConfig struct {
+	URL string `yaml:"url"`
+}
+
+// RequestLimits controls maximum request body sizes by method and route.
 type RequestLimits struct {
 	DefaultMaxBodyBytes int                          `yaml:"default_max_body_bytes"`
 	Methods             map[string]int               `yaml:"methods"`
 	Routes              map[string]RequestLimitRoute `yaml:"routes"`
 }
 
+// RequestLimitRoute is a per-route request body limit override.
 type RequestLimitRoute struct {
 	MaxBodyBytes int `yaml:"max_body_bytes"`
 }
 
+// RateLimitConfig controls token bucket rate limiting.
 type RateLimitConfig struct {
 	Enabled bool                       `yaml:"enabled"`
 	Default TokenBucketRule            `yaml:"default"`
 	Routes  map[string]TokenBucketRule `yaml:"routes"`
 }
 
+// TokenBucketRule describes one token bucket policy.
 type TokenBucketRule struct {
 	Capacity            int64   `yaml:"capacity"`
 	RefillRatePerSecond float64 `yaml:"refill_rate_per_second"`
 	Key                 string  `yaml:"key"`
 }
 
+// JWTConfig controls JWT authentication and route protection.
+type JWTConfig struct {
+	Enabled         bool     `yaml:"enabled"`
+	Secret          string   `yaml:"secret"`
+	ProtectedRoutes []string `yaml:"protected_routes"`
+	SkipRoutes      []string `yaml:"skip_routes"`
+}
+
+// IPListsConfig controls IP allow/block lists.
+type IPListsConfig struct {
+	Allow []string `yaml:"allow"`
+	Block []string `yaml:"block"`
+}
+
+// ScannerConfig controls SQLi/XSS/payload scanning.
+type ScannerConfig struct {
+	Enabled     bool `yaml:"enabled"`
+	ScanQuery   bool `yaml:"scan_query"`
+	ScanHeaders bool `yaml:"scan_headers"`
+	ScanBody    bool `yaml:"scan_body"`
+}
+
+// CORSConfig controls origin/method/header policy checks.
+type CORSConfig struct {
+	Enabled        bool     `yaml:"enabled"`
+	AllowedOrigins []string `yaml:"allowed_origins"`
+	AllowedMethods []string `yaml:"allowed_methods"`
+	AllowedHeaders []string `yaml:"allowed_headers"`
+}
+
+// SecurityLogConfig controls security audit logging.
+type SecurityLogConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
+// LoadConfig reads and parses a YAML config file.
 func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	var config Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	cfg := defaultConfig()
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	return &config, nil
+	return &cfg, nil
+}
+
+func defaultConfig() Config {
+	return Config{
+		Server: ServerConfig{
+			ListenAddr: ":8080",
+		},
+		Backend: BackendConfig{
+			URL: "http://localhost:8081",
+		},
+		RequestLimits: RequestLimits{
+			DefaultMaxBodyBytes: 1 << 20,
+		},
+		Logging: SecurityLogConfig{
+			Enabled: true,
+		},
+	}
 }
