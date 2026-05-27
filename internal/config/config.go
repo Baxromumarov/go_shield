@@ -16,6 +16,18 @@ type RequestLimits struct {
 	Methods             map[string]int `yaml:"methods"`
 }
 
+type RateLimitConfig struct {
+	Enabled bool                       `yaml:"enabled"`
+	Default TokenBucketRule            `yaml:"default"`
+	Routes  map[string]TokenBucketRule `yaml:"routes"`
+}
+
+type TokenBucketRule struct {
+	Capacity            int64   `yaml:"capacity"`
+	RefillRatePerSecond float64 `yaml:"refill_rate_per_second"`
+	Key                 string  `yaml:"key"`
+}
+
 func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
