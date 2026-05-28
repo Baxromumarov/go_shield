@@ -25,7 +25,7 @@ func TestMiddlewareDoesNothingWhenDisabled(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, requestWithContext("/", "203.0.113.10", ""))
 
@@ -53,7 +53,7 @@ func TestMiddlewareAllowsUntilBucketIsEmptyThenRejects(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, requestWithContext("/", "203.0.113.10", ""))
 
@@ -127,7 +127,7 @@ func TestMiddlewareUsesRouteSpecificRule(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, requestWithContext("/api/auth/login", "203.0.113.10", ""))
 

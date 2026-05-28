@@ -75,13 +75,24 @@ scanner:
     scan_body: true
 cors:
     enabled: true
+    allowed_hosts:
+        - "api.example.com"
+        - "localhost:8080"
     allowed_origins:
         - "https://example.com"
     allowed_methods:
         - GET
-        - POST
         - PUT
+        - POST
+        - PATCH
         - DELETE
+        - OPTIONS
+    allowed_headers:
+        - Authorization
+        - Content-Type
+        - X-Request-ID
+    allow_credentials: false
+    max_age_seconds: 600
 
 trusted_proxies:
     - "127.0.0.1"

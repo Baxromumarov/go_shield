@@ -84,10 +84,13 @@ type ScannerConfig struct {
 
 // CORSConfig controls origin/method/header policy checks.
 type CORSConfig struct {
-	Enabled        bool     `yaml:"enabled"`
-	AllowedOrigins []string `yaml:"allowed_origins"`
-	AllowedMethods []string `yaml:"allowed_methods"`
-	AllowedHeaders []string `yaml:"allowed_headers"`
+	Enabled          bool     `yaml:"enabled"`
+	AllowedHosts     []string `yaml:"allowed_hosts"`
+	AllowedOrigins   []string `yaml:"allowed_origins"`
+	AllowedMethods   []string `yaml:"allowed_methods"`
+	AllowedHeaders   []string `yaml:"allowed_headers"`
+	AllowCredentials bool     `yaml:"allow_credentials"`
+	MaxAgeSeconds    int      `yaml:"max_age_seconds"`
 }
 
 // SecurityLogConfig controls security audit logging.
@@ -110,6 +113,7 @@ func LoadConfig(path string) (*Config, error) {
 	return &cfg, nil
 }
 
+// NOTE: for testing only
 func defaultConfig() Config {
 	return Config{
 		Server: ServerConfig{
