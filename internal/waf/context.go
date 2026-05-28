@@ -8,6 +8,11 @@
 // Avoid storing large data such as full request bodies in context.
 package waf
 
+import (
+	"log"
+	"net/http"
+)
+
 type contextKey string
 
 const (
@@ -16,3 +21,13 @@ const (
 	UserIDKey    contextKey = "user_id"
 	UserRoleKey  contextKey = "user_role"
 )
+
+func GetRequestID(r *http.Request) string {
+	requestID, ok := r.Context().Value(RequestIDKey).(string)
+	if !ok {
+		// TODO: handle the error
+		log.Println("request id doesn't exists")
+	}
+
+	return requestID
+}
