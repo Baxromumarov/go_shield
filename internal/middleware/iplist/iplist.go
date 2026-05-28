@@ -13,23 +13,21 @@ import (
 func Middleware(bannedIPs []string) waf.Middleware {
 	blockedIPs := parseIPNets(bannedIPs)
 
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			clientIP := waf.GetCtxKey(r, waf.ClientIPKey)
-			parsedClientIP := net.ParseIP(clientIP)
-			if parsedClientIP == nil {
-				http.Error(w, "forbidden", http.StatusForbidden)
-				return
-			}
+	return waf.Wrap(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
+		clientIP := waf.GetCtxKey(r, waf.ClientIPKey)
+		parsedClientIP := net.ParseIP(clientIP)
+		if parsedClientIP == nil {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
 
-			if containsIP(blockedIPs, parsedClientIP) {
-				http.Error(w, "forbidden", http.StatusForbidden)
-				return
-			}
+		if containsIP(blockedIPs, parsedClientIP) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
 
-			next.ServeHTTP(w, r)
-		})
-	}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func parseIPNets(ips []string) []*net.IPNet {

@@ -35,51 +35,48 @@ var attackPatterns = []*regexp.Regexp{
 func Middleware(cfg config.ScannerConfig) waf.Middleware {
 	blockedIPs := newRuntimeBlocklist()
 
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !cfg.Enabled {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			if blockedIPs.contains(requestIP(r)) {
-				http.Error(w, "forbidden", http.StatusForbidden)
-				return
-			}
-
-			if cfg.ScanQuery && malicious(r.URL.RawQuery) {
-				block(w, r, blockedIPs)
-				return
-			}
-
-			if cfg.ScanHeaders && headersMalicious(r.Header) {
-				block(w, r, blockedIPs)
-				return
-			}
-
-			if cfg.ScanBody && r.Body != nil {
-				bodyBytes, err := io.ReadAll(r.Body)
-				if err != nil {
-					http.Error(w, "failed to read request body", http.StatusBadRequest)
-					return
-				}
-
-				r.Body.Close()
-				r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-
-				if malicious(string(bodyBytes)) {
-					block(w, r, blockedIPs)
-					return
-				}
-			}
-
+	return waf.Wrap(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
+		if !cfg.Enabled {
 			next.ServeHTTP(w, r)
-		})
-	}
+			return
+		}
+
+		if blockedIPs.contains(requestIP(r)) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		if cfg.ScanQuery && malicious(r.URL.RawQuery) {
+			block(w, r, blockedIPs)
+			return
+		}
+
+		if cfg.ScanHeaders && headersMalicious(r.Header) {
+			block(w, r, blockedIPs)
+			return
+		}
+
+		if cfg.ScanBody && r.Body != nil {
+			bodyBytes, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, "failed to read request body", http.StatusBadRequest)
+				return
+			}
+
+			r.Body.Close()
+			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
+			if malicious(string(bodyBytes)) {
+				block(w, r, blockedIPs)
+				return
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
-// if some one tries to attack our backend
-// put that bastard into blocked list
+// Runtime blocks stop repeated scanner hits from the same client IP.
 type runtimeBlocklist struct {
 	mu  sync.RWMutex
 	ips map[string]bool

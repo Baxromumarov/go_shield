@@ -16,28 +16,26 @@ import (
 func Middleware(cfg config.RateLimitConfig) waf.Middleware {
 	limiter := newLimiter()
 
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !cfg.Enabled {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			rule, scope := ruleForRequest(cfg, r)
-			if !ruleEnabled(rule) {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			key := bucketKey(scope, rule.Key, keyValue(r, rule.Key))
-			if !limiter.allow(key, rule) {
-				http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
-				return
-			}
-
+	return waf.Wrap(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
+		if !cfg.Enabled {
 			next.ServeHTTP(w, r)
-		})
-	}
+			return
+		}
+
+		rule, scope := ruleForRequest(cfg, r)
+		if !ruleEnabled(rule) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		key := bucketKey(scope, rule.Key, keyValue(r, rule.Key))
+		if !limiter.allow(key, rule) {
+			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 // this is textbook token bucket implementation

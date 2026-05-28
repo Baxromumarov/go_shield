@@ -10,18 +10,15 @@ import (
 )
 
 func Middleware() waf.Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			requestID := generateRequestID()
+	return waf.Wrap(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
+		requestID := generateRequestID()
 
-			w.Header().Set("X-Request-ID", requestID)
+		w.Header().Set("X-Request-ID", requestID)
 
-			ctx := context.WithValue(r.Context(), waf.RequestIDKey, requestID)
+		ctx := context.WithValue(r.Context(), waf.RequestIDKey, requestID)
 
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
-
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 const HeaderName = "X-Request-ID"

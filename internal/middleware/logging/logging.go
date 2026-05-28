@@ -46,32 +46,29 @@ func (w *responseWriter) Write(data []byte) (int, error) {
 }
 
 func Middleware(cfg config.SecurityLogConfig) waf.Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !cfg.Enabled {
-				next.ServeHTTP(w, r)
-				return
-			}
+	return waf.Wrap(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
+		if !cfg.Enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
 
-			start := time.Now()
-			wrappedWriter := newResponseWriter(w)
+		start := time.Now()
+		wrappedWriter := newResponseWriter(w)
 
-			next.ServeHTTP(wrappedWriter, r)
+		next.ServeHTTP(wrappedWriter, r)
 
-			requestID := waf.GetCtxKey(r, waf.RequestIDKey)
+		requestID := waf.GetCtxKey(r, waf.RequestIDKey)
 
-			log.Print(formatRequestLog(
-				time.Now().Format("15:04:05.000"),
-				r.Method,
-				requestTarget(r),
-				wrappedWriter.statusCode,
-				formatDuration(time.Since(start)),
-				formatBytes(wrappedWriter.bytes),
-				requestID,
-			))
-		})
-
-	}
+		log.Print(formatRequestLog(
+			time.Now().Format("15:04:05.000"),
+			r.Method,
+			requestTarget(r),
+			wrappedWriter.statusCode,
+			formatDuration(time.Since(start)),
+			formatBytes(wrappedWriter.bytes),
+			requestID,
+		))
+	})
 }
 
 func formatRequestLog(timestamp, method, target string, statusCode int, duration, bytes, requestID string) string {

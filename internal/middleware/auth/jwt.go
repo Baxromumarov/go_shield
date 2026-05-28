@@ -30,30 +30,28 @@ func Middleware(cfg config.JWTConfig) waf.Middleware {
 }
 
 func middlewareWithValidator(enabled bool, validator validator) waf.Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !enabled || !validator.requiresAuth(r.URL.Path) {
-				next.ServeHTTP(w, r)
-				return
-			}
+	return waf.Wrap(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
+		if !enabled || !validator.requiresAuth(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
 
-			// I guess this is most common method for JWT
-			token, ok := bearerToken(r.Header.Get("Authorization"))
-			if !ok {
-				unauthorized(w)
-				return
-			}
+		// I guess this is most common method for JWT
+		token, ok := bearerToken(r.Header.Get("Authorization"))
+		if !ok {
+			unauthorized(w)
+			return
+		}
 
-			claims, err := validator.validate(token)
-			if err != nil {
-				unauthorized(w)
-				return
-			}
+		claims, err := validator.validate(token)
+		if err != nil {
+			unauthorized(w)
+			return
+		}
 
-			ctx := contextWithClaims(r.Context(), claims)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
+		ctx := contextWithClaims(r.Context(), claims)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 type validator struct {

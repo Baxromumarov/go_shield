@@ -13,17 +13,15 @@ import (
 func Middleware(trustedProxies []string) waf.Middleware {
 	trustedNets := parseTrustedProxies(trustedProxies)
 
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			clientIP := resolveClientIP(r, trustedNets)
+	return waf.Wrap(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
+		clientIP := resolveClientIP(r, trustedNets)
 
-			// store the client IP in context
-			// later can be read
-			ctx := context.WithValue(r.Context(), waf.ClientIPKey, clientIP)
+		// store the client IP in context
+		// later can be read
+		ctx := context.WithValue(r.Context(), waf.ClientIPKey, clientIP)
 
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 func resolveClientIP(r *http.Request, trustedProxies []*net.IPNet) string {

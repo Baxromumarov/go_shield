@@ -12,48 +12,46 @@ import (
 func Middleware(cfg config.CORSConfig) waf.Middleware {
 	policy := newPolicy(cfg)
 
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !cfg.Enabled {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			if !policy.hostAllowed(r.Host) {
-				http.Error(w, "invalid host", http.StatusBadRequest)
-				return
-			}
-
-			if !policy.methodAllowed(r.Method) {
-				w.Header().Set("Allow", policy.allowedMethodsValue)
-				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-				return
-			}
-
-			origin := r.Header.Get("Origin")
-			if origin != "" {
-				if !policy.originAllowed(origin) {
-					http.Error(w, "forbidden origin", http.StatusForbidden)
-					return
-				}
-
-				policy.setCORSHeaders(w, origin)
-			}
-
-			if isPreflight(r) {
-				if !policy.preflightAllowed(r) {
-					http.Error(w, "forbidden preflight", http.StatusForbidden)
-					return
-				}
-
-				policy.setPreflightHeaders(w)
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
-
+	return waf.Wrap(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
+		if !cfg.Enabled {
 			next.ServeHTTP(w, r)
-		})
-	}
+			return
+		}
+
+		if !policy.hostAllowed(r.Host) {
+			http.Error(w, "invalid host", http.StatusBadRequest)
+			return
+		}
+
+		if !policy.methodAllowed(r.Method) {
+			w.Header().Set("Allow", policy.allowedMethodsValue)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			if !policy.originAllowed(origin) {
+				http.Error(w, "forbidden origin", http.StatusForbidden)
+				return
+			}
+
+			policy.setCORSHeaders(w, origin)
+		}
+
+		if isPreflight(r) {
+			if !policy.preflightAllowed(r) {
+				http.Error(w, "forbidden preflight", http.StatusForbidden)
+				return
+			}
+
+			policy.setPreflightHeaders(w)
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 // i used bool for value to make life easier
