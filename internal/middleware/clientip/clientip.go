@@ -41,11 +41,11 @@ func resolveClientIP(r *http.Request, trustedProxies []*net.IPNet) string {
 		return remoteIP.String()
 	}
 
-	// if it is trusted 
+	// if it is trusted
 	// we can forward it
 	if forwardedFor := r.Header.Get("X-Forwarded-For"); forwardedFor != "" {
-		parts := strings.Split(forwardedFor, ",")
-		for _, part := range parts {
+		parts := strings.SplitSeq(forwardedFor, ",")
+		for part := range parts {
 			ip := net.ParseIP(strings.TrimSpace(part))
 			if ip != nil {
 				return ip.String()

@@ -22,12 +22,12 @@ const (
 	UserRoleKey  contextKey = "user_role"
 )
 
-func GetRequestID(r *http.Request) string {
-	requestID, ok := r.Context().Value(RequestIDKey).(string)
+func GetCtxKey(r *http.Request, key contextKey) string {
+	contextValue, ok := r.Context().Value(key).(string)
 	if !ok {
 		// TODO: handle the error
-		log.Println("request id doesn't exists")
+		log.Println("request id doesn't exists or not a string")
 	}
 
-	return requestID
+	return contextValue
 }
