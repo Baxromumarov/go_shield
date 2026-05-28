@@ -121,7 +121,7 @@ func defaultConfig() Config {
 			URL: "http://localhost:8081",
 		},
 		RequestLimits: RequestLimits{
-			DefaultMaxBodyBytes: 1 << 20,
+			DefaultMaxBodyBytes: 1 << 20, // 1048576
 		},
 		Logging: SecurityLogConfig{
 			Enabled: true,

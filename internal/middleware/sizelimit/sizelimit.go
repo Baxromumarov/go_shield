@@ -16,7 +16,7 @@ func Middleware(cfg config.RequestLimits) waf.Middleware {
 			return
 		}
 
-		if limit == 0 && requestMayHaveBody(r) {
+		if limit == 0 && hasRequestBody(r) {
 			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
 			return
 		}
@@ -50,6 +50,6 @@ func limitForRequest(r *http.Request, cfg config.RequestLimits) int {
 	return limit
 }
 
-func requestMayHaveBody(r *http.Request) bool {
+func hasRequestBody(r *http.Request) bool {
 	return r.ContentLength != 0
 }

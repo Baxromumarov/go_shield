@@ -9,19 +9,19 @@ import (
 	"github.com/baxromumarov/go_shield/internal/waf"
 )
 
+const HeaderName = "X-Request-ID"
+
 func Middleware() waf.Middleware {
 	return waf.Wrap(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
 		requestID := generateRequestID()
 
-		w.Header().Set("X-Request-ID", requestID)
+		w.Header().Set(HeaderName, requestID)
 
 		ctx := context.WithValue(r.Context(), waf.RequestIDKey, requestID)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
-
-const HeaderName = "X-Request-ID"
 
 func generateRequestID() string {
 	var b [16]byte
