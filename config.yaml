@@ -1,6 +1,7 @@
 server:
     listen_addr: ":8080"
 
+# TODO: what if there are multiple backends?
 backend:
     url: "http://localhost:8081"
 
@@ -36,26 +37,18 @@ request_limits:
 rate_limits:
     enabled: true
 
-    default:
-        capacity: 100
-        refill_rate_per_second: 10
-        key: ip
-
     routes:
         "/api/auth/login":
-            capacity: 5
-            refill_rate_per_second: 0.1
-            key: ip
+            capacity: 100
+            refill_rate_per_second: 100
 
         "/api/auth/register":
-            capacity: 3
-            refill_rate_per_second: 0.05
-            key: ip
+            capacity: 50
+            refill_rate_per_second: 50
 
         "/api/files/upload":
-            capacity: 5
-            refill_rate_per_second: 0.01
-            key: user_or_ip
+            capacity: 10
+            refill_rate_per_second: 1
 
 jwt:
     enabled: true

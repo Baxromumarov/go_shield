@@ -5,12 +5,12 @@ package ratelimit
 
 import (
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/baxromumarov/go_shield/internal/config"
 	"github.com/baxromumarov/go_shield/internal/waf"
+	"golang.org/x/time/rate"
 )
 
 func Middleware(cfg config.RateLimitConfig) waf.Middleware {
@@ -22,14 +22,13 @@ func Middleware(cfg config.RateLimitConfig) waf.Middleware {
 			return
 		}
 
-		rule, scope := ruleForRequest(cfg, r)
-		if !ruleEnabled(rule) {
+		rule, ok := ruleForRequest(cfg, r)
+		if !ok {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		key := bucketKey(scope, rule.Key, keyValue(r, rule.Key))
-		if !limiter.allow(key, rule) {
+		if !limiter.allow(r.URL.Path, rule) {
 			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 			return
 		}
@@ -38,113 +37,55 @@ func Middleware(cfg config.RateLimitConfig) waf.Middleware {
 	})
 }
 
-// this is textbook token bucket implementation
-// Ask from any software engineer
+// it's a text book token bucket rate limiter
+// ask any software engineer
 type limiter struct {
 	mu      sync.Mutex
-	buckets map[string]*bucket
+	buckets map[string]*rate.Limiter
 	now     func() time.Time
-}
-
-type bucket struct {
-	tokens     float64
-	lastRefill time.Time
 }
 
 func newLimiter() *limiter {
 	return &limiter{
-		buckets: make(map[string]*bucket),
+		buckets: make(map[string]*rate.Limiter),
 		now:     time.Now,
 	}
 }
 
 func (l *limiter) allow(key string, rule config.TokenBucketRule) bool {
+	if !ruleEnabled(rule) {
+		return true
+	}
+
+	bucket := l.bucket(key, rule)
+
+	return bucket.AllowN(l.now(), 1)
+}
+
+func (l *limiter) bucket(key string, rule config.TokenBucketRule) *rate.Limiter {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	now := l.now()
-	b, ok := l.buckets[key]
-	if !ok {
-		b = &bucket{
-			tokens:     float64(rule.Capacity),
-			lastRefill: now,
-		}
-		l.buckets[key] = b
+	bucket, ok := l.buckets[key]
+	if ok {
+		return bucket
 	}
 
-	refill(b, rule, now)
-
-	if b.tokens < 1 {
-		return false
-	}
-
-	b.tokens--
-	return true
+	bucket = rate.NewLimiter(rate.Limit(rule.RefillRatePerSecond), int(rule.Capacity))
+	l.buckets[key] = bucket
+	return bucket
 }
 
-func refill(b *bucket, rule config.TokenBucketRule, now time.Time) {
-	if now.Before(b.lastRefill) {
-		b.lastRefill = now
-		return
-	}
-
-	elapsed := now.Sub(b.lastRefill).Seconds()
-	if elapsed <= 0 || rule.RefillRatePerSecond <= 0 {
-		return
-	}
-
-	b.tokens += elapsed * rule.RefillRatePerSecond
-	if b.tokens > float64(rule.Capacity) {
-		b.tokens = float64(rule.Capacity)
-	}
-	b.lastRefill = now
-}
-
-func ruleForRequest(cfg config.RateLimitConfig, r *http.Request) (config.TokenBucketRule, string) {
+func ruleForRequest(cfg config.RateLimitConfig, r *http.Request) (config.TokenBucketRule, bool) {
 	if cfg.Routes != nil {
 		if rule, ok := cfg.Routes[r.URL.Path]; ok {
-			return rule, r.URL.Path
+			return rule, ruleEnabled(rule)
 		}
 	}
 
-	return cfg.Default, "default"
+	return config.TokenBucketRule{}, false
 }
 
 func ruleEnabled(rule config.TokenBucketRule) bool {
 	return rule.Capacity > 0 && rule.RefillRatePerSecond >= 0
-}
-
-func bucketKey(scope, keyMode, value string) string {
-	return scope + "|" + strings.ToLower(strings.TrimSpace(keyMode)) + "|" + value
-}
-
-func keyValue(r *http.Request, keyMode string) string {
-	userID := waf.GetCtxKey(r, waf.UserIDKey)
-	switch strings.ToLower(strings.TrimSpace(keyMode)) {
-	case "user", "jwt_subject":
-		if userID != "" {
-			return userID
-		}
-	case "user_or_ip":
-		if userID != "" {
-			return userID
-		}
-
-		return clientIP(r)
-	case "api_key":
-		if apiKey := r.Header.Get("X-API-Key"); apiKey != "" {
-			return apiKey
-		}
-	}
-
-	return clientIP(r)
-}
-
-func clientIP(r *http.Request) string {
-	clientIP := waf.GetCtxKey(r, waf.ClientIPKey)
-	if clientIP != "" {
-		return clientIP
-	}
-
-	return r.RemoteAddr
 }

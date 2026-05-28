@@ -55,7 +55,6 @@ type RequestLimitRoute struct {
 // RateLimitConfig controls token bucket rate limiting.
 type RateLimitConfig struct {
 	Enabled bool                       `yaml:"enabled"`
-	Default TokenBucketRule            `yaml:"default"`
 	Routes  map[string]TokenBucketRule `yaml:"routes"`
 }
 
@@ -63,7 +62,6 @@ type RateLimitConfig struct {
 type TokenBucketRule struct {
 	Capacity            int64   `yaml:"capacity"`
 	RefillRatePerSecond float64 `yaml:"refill_rate_per_second"`
-	Key                 string  `yaml:"key"`
 }
 
 // JWTConfig controls JWT authentication and route protection.

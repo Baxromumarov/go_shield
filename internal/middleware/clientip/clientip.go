@@ -42,12 +42,8 @@ func resolveClientIP(r *http.Request, trustedProxies []*net.IPNet) string {
 	// if it is trusted
 	// we can forward it
 	if forwardedFor := r.Header.Get("X-Forwarded-For"); forwardedFor != "" {
-		parts := strings.SplitSeq(forwardedFor, ",")
-		for part := range parts {
-			ip := net.ParseIP(strings.TrimSpace(part))
-			if ip != nil {
-				return ip.String()
-			}
+		if ip, ok := clientIPFromForwardedFor(forwardedFor, trustedProxies); ok {
+			return ip
 		}
 	}
 
@@ -59,6 +55,29 @@ func resolveClientIP(r *http.Request, trustedProxies []*net.IPNet) string {
 	}
 
 	return remoteIP.String()
+}
+
+func clientIPFromForwardedFor(forwardedFor string, trustedProxies []*net.IPNet) (string, bool) {
+	parts := strings.Split(forwardedFor, ",")
+	leftmostValid := ""
+
+	for i := len(parts) - 1; i >= 0; i-- {
+		ip := net.ParseIP(strings.TrimSpace(parts[i]))
+		if ip == nil {
+			continue
+		}
+
+		leftmostValid = ip.String()
+		if !isTrustedProxy(ip, trustedProxies) {
+			return ip.String(), true
+		}
+	}
+
+	if leftmostValid != "" {
+		return leftmostValid, true
+	}
+
+	return "", false
 }
 
 func parseRemoteIP(remoteAddr string) net.IP {

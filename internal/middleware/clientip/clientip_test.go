@@ -41,15 +41,33 @@ func TestResolveClientIPIgnoresForwardedHeadersFromUntrustedRemote(t *testing.T)
 	}
 }
 
-func TestResolveClientIPUsesFirstForwardedForIPFromTrustedProxy(t *testing.T) {
+func TestResolveClientIPUsesLeftmostForwardedForIPWhenAllLaterHopsAreTrusted(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
 	request.RemoteAddr = "10.0.0.10:1234"
 	request.Header.Set("X-Forwarded-For", "203.0.113.25, 10.0.0.20")
 
-	got := resolveClientIP(request, parseTrustedProxies([]string{"10.0.0.10"}))
+	got := resolveClientIP(request, parseTrustedProxies([]string{
+		"10.0.0.10",
+		"10.0.0.20",
+	}))
 
 	if got != "203.0.113.25" {
 		t.Fatalf("expected first forwarded IP %q, got %q", "203.0.113.25", got)
+	}
+}
+
+func TestResolveClientIPUsesRightmostUntrustedForwardedForIPFromTrustedProxy(t *testing.T) {
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.RemoteAddr = "10.0.0.10:1234"
+	request.Header.Set("X-Forwarded-For", "198.51.100.50, 203.0.113.25, 10.0.0.20")
+
+	got := resolveClientIP(request, parseTrustedProxies([]string{
+		"10.0.0.10",
+		"10.0.0.20",
+	}))
+
+	if got != "203.0.113.25" {
+		t.Fatalf("expected rightmost untrusted forwarded IP %q, got %q", "203.0.113.25", got)
 	}
 }
 

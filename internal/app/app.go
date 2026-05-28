@@ -38,9 +38,9 @@ func New(cfg *config.Config) (http.Handler, error) {
 		clientip.Middleware(cfg.TrustedProxies),
 		sizelimit.Middleware(cfg.RequestLimits),
 		iplist.Middleware(cfg.BannedIPs),
-		ratelimit.Middleware(cfg.RateLimits),
 		cors.Middleware(cfg.CORS),
 		auth.Middleware(cfg.JWT),
+		ratelimit.Middleware(cfg.RateLimits),
 		scanner.Middleware(cfg.Scanner),
 	), nil
 }
