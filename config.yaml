@@ -66,11 +66,8 @@ jwt:
     skip_routes:
         - "/api/auth/login"
         - "/api/auth/register"
-ip_lists:
-    allow:
-        - "127.0.0.1"
-    block:
-        - "10.0.0.5"
+banned_ips:
+    - "10.0.0.5"
 scanner:
     enabled: true
     scan_query: true

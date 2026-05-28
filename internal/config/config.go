@@ -23,7 +23,7 @@ type Config struct {
 	RequestLimits  RequestLimits     `yaml:"request_limits"`
 	RateLimits     RateLimitConfig   `yaml:"rate_limits"`
 	JWT            JWTConfig         `yaml:"jwt"`
-	IPLists        IPListsConfig     `yaml:"ip_lists"`
+	BannedIPs      []string          `yaml:"banned_ips"`
 	Scanner        ScannerConfig     `yaml:"scanner"`
 	CORS           CORSConfig        `yaml:"cors"`
 	Logging        SecurityLogConfig `yaml:"logging"`
@@ -72,12 +72,6 @@ type JWTConfig struct {
 	Secret          string   `yaml:"secret"`
 	ProtectedRoutes []string `yaml:"protected_routes"`
 	SkipRoutes      []string `yaml:"skip_routes"`
-}
-
-// IPListsConfig controls IP allow/block lists.
-type IPListsConfig struct {
-	Allow []string `yaml:"allow"`
-	Block []string `yaml:"block"`
 }
 
 // ScannerConfig controls SQLi/XSS/payload scanning.
