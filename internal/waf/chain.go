@@ -1,11 +1,4 @@
 // Package waf contains shared building blocks for the GoShield security pipeline.
-//
-// This file defines how middleware components are connected together.
-// Each WAF feature should be a small middleware that either blocks the request
-// or passes it to the next handler.
-//
-// Plan: keep this package generic. It should not know about SQLi, JWT, CORS,
-// or rate limiting directly; it only provides the common pipeline mechanism.
 package waf
 
 import "net/http"

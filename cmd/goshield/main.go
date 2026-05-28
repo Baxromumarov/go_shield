@@ -1,13 +1,5 @@
-// Package main is the executable entry point for GoShield.
-//
-// This file is responsible only for application startup:
-//   - load configuration from config.yaml
-//   - build the GoShield HTTP handler from internal/app
-//   - start the HTTP server
-//   - handle graceful shutdown signals
-//
-// Plan: keep this file small. All WAF, proxy, auth, rate-limit, scanner,
-// and logging logic should live in internal packages, not in main.go.
+// project is for learning purpose
+// for production, some parts need changes
 package main
 
 import (

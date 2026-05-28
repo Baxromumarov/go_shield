@@ -76,7 +76,12 @@ func Middleware(cfg config.ScannerConfig) waf.Middleware {
 	})
 }
 
+// if some one tries to attack our backend
+// put that bastard into blocked list
 // Runtime blocks stop repeated scanner hits from the same client IP.
+// it is in memory right now, but can be implemented distributed version 
+// there is also false positive issue can happen
+// this is risky for NAT or shared IPs
 type runtimeBlocklist struct {
 	mu  sync.RWMutex
 	ips map[string]bool
