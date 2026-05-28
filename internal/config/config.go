@@ -18,15 +18,16 @@ import (
 
 // Config is the root configuration for the whole GoShield process.
 type Config struct {
-	Server        ServerConfig      `yaml:"server"`
-	Backend       BackendConfig     `yaml:"backend"`
-	RequestLimits RequestLimits     `yaml:"request_limits"`
-	RateLimits    RateLimitConfig   `yaml:"rate_limits"`
-	JWT           JWTConfig         `yaml:"jwt"`
-	IPLists       IPListsConfig     `yaml:"ip_lists"`
-	Scanner       ScannerConfig     `yaml:"scanner"`
-	CORS          CORSConfig        `yaml:"cors"`
-	Logging       SecurityLogConfig `yaml:"logging"`
+	Server         ServerConfig      `yaml:"server"`
+	Backend        BackendConfig     `yaml:"backend"`
+	RequestLimits  RequestLimits     `yaml:"request_limits"`
+	RateLimits     RateLimitConfig   `yaml:"rate_limits"`
+	JWT            JWTConfig         `yaml:"jwt"`
+	IPLists        IPListsConfig     `yaml:"ip_lists"`
+	Scanner        ScannerConfig     `yaml:"scanner"`
+	CORS           CORSConfig        `yaml:"cors"`
+	Logging        SecurityLogConfig `yaml:"logging"`
+	TrustedProxies []string          `yaml:"trusted_proxies"`
 }
 
 // ServerConfig controls the public GoShield HTTP server.
