@@ -40,7 +40,7 @@ func New(cfg *config.Config) (http.Handler, error) {
 		iplist.Middleware(cfg.IPLists),
 		ratelimit.Middleware(cfg.RateLimits),
 		cors.Middleware(cfg.CORS),
-		auth.JWTMiddleware(cfg.JWT),
+		auth.Middleware(cfg.JWT),
 		scanner.Middleware(cfg.Scanner),
 	), nil
 }
