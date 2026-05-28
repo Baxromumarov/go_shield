@@ -14,6 +14,7 @@ import (
 	"github.com/baxromumarov/go_shield/internal/middleware/clientip"
 	"github.com/baxromumarov/go_shield/internal/middleware/iplist"
 	"github.com/baxromumarov/go_shield/internal/middleware/logging"
+	"github.com/baxromumarov/go_shield/internal/middleware/ratelimit"
 	"github.com/baxromumarov/go_shield/internal/middleware/requestid"
 	"github.com/baxromumarov/go_shield/internal/middleware/sizelimit"
 	"github.com/baxromumarov/go_shield/internal/proxy"
@@ -34,7 +35,7 @@ func New(cfg *config.Config) (http.Handler, error) {
 		clientip.Middleware(cfg.TrustedProxies),
 		sizelimit.Middleware(cfg.RequestLimits),
 		iplist.Middleware(cfg.BannedIPs),
-		// ratelimit.Middleware(cfg.RateLimits),
+		ratelimit.Middleware(cfg.RateLimits),
 		// cors.Middleware(cfg.CORS),
 		// auth.Middleware(cfg.JWT),
 		// scanner.Middleware(cfg.Scanner),
