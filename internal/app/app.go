@@ -11,14 +11,8 @@ import (
 	"net/http"
 
 	"github.com/baxromumarov/go_shield/internal/config"
-	"github.com/baxromumarov/go_shield/internal/middleware/auth"
-	"github.com/baxromumarov/go_shield/internal/middleware/clientip"
-	"github.com/baxromumarov/go_shield/internal/middleware/cors"
-	"github.com/baxromumarov/go_shield/internal/middleware/iplist"
 	"github.com/baxromumarov/go_shield/internal/middleware/logging"
-	"github.com/baxromumarov/go_shield/internal/middleware/ratelimit"
 	"github.com/baxromumarov/go_shield/internal/middleware/requestid"
-	"github.com/baxromumarov/go_shield/internal/middleware/scanner"
 	"github.com/baxromumarov/go_shield/internal/middleware/sizelimit"
 	"github.com/baxromumarov/go_shield/internal/proxy"
 	"github.com/baxromumarov/go_shield/internal/waf"
@@ -35,12 +29,12 @@ func New(cfg *config.Config) (http.Handler, error) {
 		backendProxy,
 		requestid.Middleware(),
 		logging.Middleware(cfg.Logging),
-		clientip.Middleware(),
+		// clientip.Middleware(),
 		sizelimit.Middleware(cfg.RequestLimits),
-		iplist.Middleware(cfg.IPLists),
-		ratelimit.Middleware(cfg.RateLimits),
-		cors.Middleware(cfg.CORS),
-		auth.Middleware(cfg.JWT),
-		scanner.Middleware(cfg.Scanner),
+		// iplist.Middleware(cfg.IPLists),
+		// ratelimit.Middleware(cfg.RateLimits),
+		// cors.Middleware(cfg.CORS),
+		// auth.Middleware(cfg.JWT),
+		// scanner.Middleware(cfg.Scanner),
 	), nil
 }

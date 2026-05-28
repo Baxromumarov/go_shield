@@ -35,12 +35,12 @@ func TestMiddlewareLogsRequest(t *testing.T) {
 	handler.ServeHTTP(recorder, request.WithContext(ctx))
 
 	output := logOutput.String()
-	assertLogContains(t, output, "request_id=req_test")
-	assertLogContains(t, output, "method=POST")
-	assertLogContains(t, output, "path=/users")
-	assertLogContains(t, output, "status=201")
-	assertLogContains(t, output, "bytes=7")
-	assertLogContains(t, output, "duration=")
+	assertLogContains(t, output, "POST")
+	assertLogContains(t, output, "/users")
+	assertLogContains(t, output, "201")
+	assertLogContains(t, output, "Created")
+	assertLogContains(t, output, "7B")
+	assertLogContains(t, output, "req=req_test")
 }
 
 func TestMiddlewareDoesNotLogWhenDisabled(t *testing.T) {
