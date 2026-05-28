@@ -58,7 +58,7 @@ func Middleware(cfg config.SecurityLogConfig) waf.Middleware {
 
 			next.ServeHTTP(wrappedWriter, r)
 
-			requestID, _ := r.Context().Value(waf.RequestIDKey).(string)
+			requestID := waf.GetCtxKey(r, waf.RequestIDKey)
 
 			log.Print(formatRequestLog(
 				time.Now().Format("15:04:05.000"),

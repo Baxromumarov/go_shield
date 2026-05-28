@@ -121,13 +121,14 @@ func bucketKey(scope, keyMode, value string) string {
 }
 
 func keyValue(r *http.Request, keyMode string) string {
+	userID := waf.GetCtxKey(r, waf.UserIDKey)
 	switch strings.ToLower(strings.TrimSpace(keyMode)) {
 	case "user", "jwt_subject":
-		if userID, _ := r.Context().Value(waf.UserIDKey).(string); userID != "" {
+		if userID != "" {
 			return userID
 		}
 	case "user_or_ip":
-		if userID, _ := r.Context().Value(waf.UserIDKey).(string); userID != "" {
+		if userID != "" {
 			return userID
 		}
 
@@ -142,7 +143,8 @@ func keyValue(r *http.Request, keyMode string) string {
 }
 
 func clientIP(r *http.Request) string {
-	if clientIP, _ := r.Context().Value(waf.ClientIPKey).(string); clientIP != "" {
+	clientIP := waf.GetCtxKey(r, waf.ClientIPKey)
+	if clientIP != "" {
 		return clientIP
 	}
 

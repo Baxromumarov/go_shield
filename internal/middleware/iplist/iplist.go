@@ -15,7 +15,7 @@ func Middleware(bannedIPs []string) waf.Middleware {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			clientIP, _ := r.Context().Value(waf.ClientIPKey).(string)
+			clientIP := waf.GetCtxKey(r, waf.ClientIPKey)
 			parsedClientIP := net.ParseIP(clientIP)
 			if parsedClientIP == nil {
 				http.Error(w, "forbidden", http.StatusForbidden)

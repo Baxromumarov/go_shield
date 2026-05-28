@@ -13,7 +13,7 @@ func TestMiddlewareAddsClientIPToContext(t *testing.T) {
 	var contextClientIP string
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		contextClientIP, _ = r.Context().Value(waf.ClientIPKey).(string)
+		contextClientIP = waf.GetCtxKey(r, waf.ClientIPKey)
 	})
 	handler := Middleware([]string{"10.0.0.10"})(next)
 
@@ -139,4 +139,3 @@ func TestParseTrustedProxiesSupportsSingleIPsAndCIDRs(t *testing.T) {
 		})
 	}
 }
-

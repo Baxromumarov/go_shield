@@ -1,3 +1,4 @@
+// RFC7519 = https://datatracker.ietf.org/doc/html/rfc7519
 package auth
 
 import (
@@ -145,7 +146,7 @@ func (v validator) validateTimeClaims(claims map[string]any) error {
 		return errExpiredToken
 	}
 
-	// nbf = not before
+	// nbf = not before (https://datatracker.ietf.org/doc/html/rfc7519#page-10)
 	// It is a standard JWT time claim that says:
 	// {This token must not be accepted before this Unix timestamp.}
 	if nbf, ok := numericClaim(claims, "nbf"); ok && nbf > now {

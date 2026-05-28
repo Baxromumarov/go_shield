@@ -32,7 +32,7 @@ func TestMiddlewareAddsRequestIDToContext(t *testing.T) {
 	var contextRequestID string
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		contextRequestID, _ = r.Context().Value(waf.RequestIDKey).(string)
+		contextRequestID = waf.GetCtxKey(r, waf.RequestIDKey)
 	})
 	handler := Middleware()(next)
 

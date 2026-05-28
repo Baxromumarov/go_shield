@@ -113,8 +113,9 @@ func TestMiddlewareAcceptsValidTokenAndStoresClaimsInContext(t *testing.T) {
 	var userID string
 	var role string
 	handler := middlewareWithNow(testJWTConfig(), now)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID, _ = r.Context().Value(waf.UserIDKey).(string)
-		role, _ = r.Context().Value(waf.UserRoleKey).(string)
+		userID = waf.GetCtxKey(r, waf.UserIDKey)
+		role = waf.GetCtxKey(r, waf.UserRoleKey)
+
 		w.WriteHeader(http.StatusOK)
 	}))
 
