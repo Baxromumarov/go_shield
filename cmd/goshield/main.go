@@ -4,7 +4,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,12 +18,14 @@ import (
 func main() {
 	cfg, err := config.LoadConfig("config.yaml")
 	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
+		slog.Error("failed to load config", "error", err)
+		os.Exit(1)
 	}
 
 	handler, err := app.New(cfg)
 	if err != nil {
-		log.Fatalf("failed to build application: %v", err)
+		slog.Error("failed to build application", "error", err)
+		os.Exit(1)
 	}
 
 	server := &http.Server{
@@ -35,9 +37,10 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("GoShield listening on %s and proxying to %s", cfg.Server.ListenAddr, cfg.Backend.URL)
+		slog.Info("GoShield listening", "addr", cfg.Server.ListenAddr, "backend", cfg.Backend.URL)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("http listen error: %v", err)
+			slog.Error("http listen error", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -45,12 +48,13 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 
-	log.Println("GoShield is shutting down...")
+	slog.Info("GoShield is shutting down")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("http shutdown error: %v", err)
+		slog.Error("http shutdown error", "error", err)
+		os.Exit(1)
 	}
 }

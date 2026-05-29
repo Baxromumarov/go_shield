@@ -2,7 +2,7 @@ package logging
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -59,7 +59,7 @@ func Middleware(cfg config.SecurityLogConfig) waf.Middleware {
 
 		requestID := waf.GetCtxKey(r, waf.RequestIDKey)
 
-		log.Print(formatRequestLog(
+		slog.Info(formatRequestLog(
 			time.Now().Format("15:04:05.000"),
 			r.Method,
 			requestTarget(r),

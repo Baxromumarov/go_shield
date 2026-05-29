@@ -1,7 +1,7 @@
 package waf
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 )
 
@@ -18,7 +18,7 @@ func GetCtxKey(r *http.Request, key contextKey) string {
 	contextValue, ok := r.Context().Value(key).(string)
 	if !ok {
 		// TODO: handle the error
-		log.Println("request id doesn't exists or not a string")
+		slog.Warn("request context value missing or not a string", "key", string(key))
 	}
 
 	return contextValue

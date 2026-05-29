@@ -3,7 +3,7 @@ package logging
 import (
 	"bytes"
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,12 +15,9 @@ import (
 
 func TestMiddlewareLogsRequest(t *testing.T) {
 	var logOutput bytes.Buffer
-	originalOutput := log.Writer()
-	originalFlags := log.Flags()
-	log.SetOutput(&logOutput)
-	log.SetFlags(0)
-	defer log.SetOutput(originalOutput)
-	defer log.SetFlags(originalFlags)
+	originalLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logOutput, nil)))
+	defer slog.SetDefault(originalLogger)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
@@ -45,12 +42,9 @@ func TestMiddlewareLogsRequest(t *testing.T) {
 
 func TestMiddlewareDoesNotLogWhenDisabled(t *testing.T) {
 	var logOutput bytes.Buffer
-	originalOutput := log.Writer()
-	originalFlags := log.Flags()
-	log.SetOutput(&logOutput)
-	log.SetFlags(0)
-	defer log.SetOutput(originalOutput)
-	defer log.SetFlags(originalFlags)
+	originalLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logOutput, nil)))
+	defer slog.SetDefault(originalLogger)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)

@@ -3,8 +3,9 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 )
 
 func main() {
@@ -25,8 +26,9 @@ func main() {
 		fmt.Fprintf(w, "body: %s\n", string(body))
 	})
 
-	log.Println("test backend listening on :8081")
+	slog.Info("test backend listening", "addr", ":8081")
 	if err := http.ListenAndServe(":8081", handler); err != nil {
-		log.Fatal(err)
+		slog.Error("test backend listen error", "error", err)
+		os.Exit(1)
 	}
 }
