@@ -198,6 +198,75 @@ func TestMiddlewareRejectsTokenWithInvalidSignature(t *testing.T) {
 	assertUnauthorizedToken(t, token, now)
 }
 
+func TestMiddlewareValidatesIssuerAndAudienceWhenConfigured(t *testing.T) {
+	now := time.Date(2026, 5, 28, 12, 0, 0, 0, time.UTC)
+	cfg := testJWTConfig()
+	cfg.Issuer = "goshield"
+	cfg.Audience = "api"
+
+	token := signToken(t, "secret", map[string]any{
+		"alg": "HS256",
+	}, map[string]any{
+		"sub": "user-123",
+		"exp": now.Add(time.Hour).Unix(),
+		"iss": "goshield",
+		"aud": "api",
+	})
+
+	called := false
+	handler := middlewareWithNow(cfg, now)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/users", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+
+	handler.ServeHTTP(recorder, request)
+
+	if !called {
+		t.Fatal("expected next handler to be called")
+	}
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, recorder.Code)
+	}
+}
+
+func TestMiddlewareRejectsWrongAudience(t *testing.T) {
+	now := time.Date(2026, 5, 28, 12, 0, 0, 0, time.UTC)
+	cfg := testJWTConfig()
+	cfg.Audience = "api"
+
+	token := signToken(t, "secret", map[string]any{
+		"alg": "HS256",
+	}, map[string]any{
+		"sub": "user-123",
+		"exp": now.Add(time.Hour).Unix(),
+		"aud": "other-api",
+	})
+
+	called := false
+	handler := middlewareWithNow(cfg, now)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}))
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/users", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+
+	handler.ServeHTTP(recorder, request)
+
+	if called {
+		t.Fatal("expected next handler not to be called")
+	}
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, recorder.Code)
+	}
+}
+
 func TestRequiresAuthUsesPathBoundary(t *testing.T) {
 	validator := newValidator(config.JWTConfig{
 		ProtectedRoutes: []string{

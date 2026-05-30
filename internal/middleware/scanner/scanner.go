@@ -2,23 +2,27 @@ package scanner
 
 import (
 	"bytes"
+	"errors"
 	"html"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
 	"regexp"
 	"slices"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/baxromumarov/go_shield/internal/config"
+	"github.com/baxromumarov/go_shield/internal/state"
 	"github.com/baxromumarov/go_shield/internal/waf"
 )
 
 const maxDecodePasses = 2
+const defaultRuntimeBlockTTL = 15 * time.Minute
 
-// common SQLi and XSS list
+// Common SQLi and XSS patterns. Regex WAF: brave, cheap, and not magic.
 var attackPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)(?:^|[^\w])(?:or|and)\s+['"]?[\w.-]+['"]?\s*=\s*['"]?[\w.-]+`),
 	regexp.MustCompile(`(?i)\bunion\s+(?:all\s+)?select\b`),
@@ -32,8 +36,8 @@ var attackPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\b(?:javascript|data)\s*:`),
 }
 
-func Middleware(cfg config.ScannerConfig) waf.Middleware {
-	blockedIPs := newRuntimeBlocklist()
+func Middleware(cfg config.ScannerConfig, stores ...state.BlocklistStore) waf.Middleware {
+	blocklist := newBlocklist(cfg, stores...)
 
 	return waf.Wrap(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
 		if !cfg.Enabled {
@@ -41,24 +45,32 @@ func Middleware(cfg config.ScannerConfig) waf.Middleware {
 			return
 		}
 
-		if blockedIPs.contains(requestIP(r)) {
+		if blocked, err := blocklist.contains(r); err != nil {
+			slog.Warn("scanner blocklist lookup failed", "error", err)
+		} else if blocked {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
 
 		if cfg.ScanQuery && malicious(r.URL.RawQuery) {
-			block(w, r, blockedIPs)
+			block(w, r, blocklist)
 			return
 		}
 
 		if cfg.ScanHeaders && headersMalicious(r.Header) {
-			block(w, r, blockedIPs)
+			block(w, r, blocklist)
 			return
 		}
 
 		if cfg.ScanBody && r.Body != nil {
 			bodyBytes, err := io.ReadAll(r.Body)
 			if err != nil {
+				var maxBytesError *http.MaxBytesError
+				if errors.As(err, &maxBytesError) {
+					http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+					return
+				}
+
 				http.Error(w, "failed to read request body", http.StatusBadRequest)
 				return
 			}
@@ -67,7 +79,7 @@ func Middleware(cfg config.ScannerConfig) waf.Middleware {
 			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
 			if malicious(string(bodyBytes)) {
-				block(w, r, blockedIPs)
+				block(w, r, blocklist)
 				return
 			}
 		}
@@ -76,43 +88,49 @@ func Middleware(cfg config.ScannerConfig) waf.Middleware {
 	})
 }
 
-// if some one tries to attack our backend
-// put that bastard into blocked list
-// Runtime blocks stop repeated scanner hits from the same client IP.
-// it is in memory right now, but can be implemented distributed version 
-// there is also false positive issue can happen
-// this is risky for NAT or shared IPs
+// If someone tries to attack our backend, put that bastard into timeout.
+// TTL matters because false positives and shared NAT IPs are real life.
 type runtimeBlocklist struct {
-	mu  sync.RWMutex
-	ips map[string]bool
+	store state.BlocklistStore
+	ttl   time.Duration
 }
 
-func newRuntimeBlocklist() *runtimeBlocklist {
+func newBlocklist(cfg config.ScannerConfig, stores ...state.BlocklistStore) *runtimeBlocklist {
+	store := state.BlocklistStore(state.NewMemory())
+	if len(stores) > 0 && stores[0] != nil {
+		store = stores[0]
+	}
+
+	ttl := time.Duration(cfg.RuntimeBlockTTLSeconds) * time.Second
+	if ttl <= 0 {
+		ttl = defaultRuntimeBlockTTL
+	}
+
 	return &runtimeBlocklist{
-		ips: make(map[string]bool),
+		store: store,
+		ttl:   ttl,
 	}
 }
 
-func (b *runtimeBlocklist) add(ip string) {
+func (b *runtimeBlocklist) add(r *http.Request) error {
+	ip := requestIP(r)
 	if ip == "" {
-		return
+		return nil
 	}
 
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	b.ips[ip] = true
+	return b.store.Block(r.Context(), state.BlockEntry{
+		Key: scannerBlockKey(ip),
+		TTL: b.ttl,
+	})
 }
 
-func (b *runtimeBlocklist) contains(ip string) bool {
+func (b *runtimeBlocklist) contains(r *http.Request) (bool, error) {
+	ip := requestIP(r)
 	if ip == "" {
-		return false
+		return false, nil
 	}
 
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-
-	return b.ips[ip]
+	return b.store.Blocked(r.Context(), scannerBlockKey(ip))
 }
 
 func headersMalicious(header http.Header) bool {
@@ -164,12 +182,15 @@ func normalize(value string) string {
 }
 
 func block(w http.ResponseWriter, r *http.Request, blockedIPs *runtimeBlocklist) {
-	blockedIPs.add(requestIP(r))
+	if err := blockedIPs.add(r); err != nil {
+		slog.Warn("scanner blocklist update failed", "error", err)
+	}
+
 	http.Error(w, "forbidden payload", http.StatusForbidden)
 }
 
 func requestIP(r *http.Request) string {
-	if clientIP := waf.GetCtxKey(r, waf.ClientIPKey); clientIP != "" {
+	if clientIP, ok := waf.LookupCtxKey(r, waf.ClientIPKey); ok && clientIP != "" {
 		return clientIP
 	}
 
@@ -184,4 +205,8 @@ func requestIP(r *http.Request) string {
 	}
 
 	return ip.String()
+}
+
+func scannerBlockKey(ip string) string {
+	return "scanner:ip:" + ip
 }

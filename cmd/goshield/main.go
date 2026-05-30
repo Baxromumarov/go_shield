@@ -1,5 +1,5 @@
-// project is for learning purpose
-// for production, some parts need changes
+// Project is for learning purpose.
+// For production, some parts need changes.
 package main
 
 import (

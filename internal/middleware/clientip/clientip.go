@@ -1,4 +1,4 @@
-// High level logic: [Find the real client IP -> store it in request context -> let the next middleware continue]
+// Find the real client IP, stash it in context, move on with life.
 package clientip
 
 import (
@@ -15,9 +15,6 @@ func Middleware(trustedProxies []string) waf.Middleware {
 
 	return waf.Wrap(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
 		clientIP := resolveClientIP(r, trustedNets)
-
-		// store the client IP in context
-		// later can be read
 		ctx := context.WithValue(r.Context(), waf.ClientIPKey, clientIP)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -30,17 +27,11 @@ func resolveClientIP(r *http.Request, trustedProxies []*net.IPNet) string {
 		return ""
 	}
 
-	// If direct peer is not trusted ignore headers
-	// If the request did not come from a trusted proxy, then headers like these are ignored:
-	// Example:
-	//        X-Forwarded-For: 1.2.3.4
-	//        X-Real-IP: 1.2.3.4
+	// If the direct peer is not trusted, ignore forwarded headers. Nice try.
 	if !isTrustedProxy(remoteIP, trustedProxies) {
 		return remoteIP.String()
 	}
 
-	// if it is trusted
-	// we can forward it
 	if forwardedFor := r.Header.Get("X-Forwarded-For"); forwardedFor != "" {
 		if ip, ok := clientIPFromForwardedFor(forwardedFor, trustedProxies); ok {
 			return ip

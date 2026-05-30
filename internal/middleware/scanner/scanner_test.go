@@ -7,8 +7,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/baxromumarov/go_shield/internal/config"
+	"github.com/baxromumarov/go_shield/internal/state"
 	"github.com/baxromumarov/go_shield/internal/waf"
 )
 
@@ -225,6 +227,39 @@ func TestMiddlewareAddsAttackingClientIPToRuntimeBlocklist(t *testing.T) {
 
 	if called != 1 {
 		t.Fatalf("expected next handler to be called once, got %d", called)
+	}
+}
+
+func TestRuntimeBlocklistExpires(t *testing.T) {
+	now := time.Date(2026, 5, 30, 12, 0, 0, 0, time.UTC)
+	store := state.NewMemoryWithClock(func() time.Time {
+		return now
+	})
+	blocklist := newBlocklist(config.ScannerConfig{
+		RuntimeBlockTTLSeconds: 1,
+	}, store)
+
+	request := requestWithClientIP(http.MethodGet, "/", "", "203.0.113.10")
+	if err := blocklist.add(request); err != nil {
+		t.Fatalf("expected blocklist add to succeed: %v", err)
+	}
+
+	blocked, err := blocklist.contains(request)
+	if err != nil {
+		t.Fatalf("expected blocklist lookup to succeed: %v", err)
+	}
+	if !blocked {
+		t.Fatal("expected client IP to be blocked")
+	}
+
+	now = now.Add(2 * time.Second)
+
+	blocked, err = blocklist.contains(request)
+	if err != nil {
+		t.Fatalf("expected blocklist lookup to succeed: %v", err)
+	}
+	if blocked {
+		t.Fatal("expected client IP block to expire")
 	}
 }
 

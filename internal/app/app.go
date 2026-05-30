@@ -1,14 +1,11 @@
-// Package app wires GoShield components into one HTTP handler.
-//
-// This file is the composition root of the project. It connects configuration,
-// middleware, and the reverse proxy into the final request pipeline.
-//
-// Plan: when a new security component is added, build it here and place it in
-// the correct order in the middleware chain. main.go should call only app.New.
+// Package app builds the GoShield HTTP handler stack.
 package app
 
 import (
+	"context"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/baxromumarov/go_shield/internal/config"
 	"github.com/baxromumarov/go_shield/internal/middleware/auth"
@@ -21,12 +18,25 @@ import (
 	"github.com/baxromumarov/go_shield/internal/middleware/scanner"
 	"github.com/baxromumarov/go_shield/internal/middleware/sizelimit"
 	"github.com/baxromumarov/go_shield/internal/proxy"
+	"github.com/baxromumarov/go_shield/internal/state"
 	"github.com/baxromumarov/go_shield/internal/waf"
 )
 
 // New creates the full GoShield HTTP handler.
 func New(cfg *config.Config) (http.Handler, error) {
-	backendProxy, err := proxy.NewReverseProxy(cfg.Backend.URL)
+	if cfg == nil {
+		return nil, fmt.Errorf("config is required")
+	}
+
+	stateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stateStore, err := state.New(stateCtx, cfg.State)
+	if err != nil {
+		return nil, err
+	}
+
+	backendProxy, err := proxy.NewReverseProxyWithConfig(cfg.Backend)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +50,7 @@ func New(cfg *config.Config) (http.Handler, error) {
 		iplist.Middleware(cfg.BannedIPs),
 		cors.Middleware(cfg.CORS),
 		auth.Middleware(cfg.JWT),
-		ratelimit.Middleware(cfg.RateLimits),
-		scanner.Middleware(cfg.Scanner),
+		ratelimit.Middleware(cfg.RateLimits, stateStore),
+		scanner.Middleware(cfg.Scanner, stateStore),
 	), nil
 }

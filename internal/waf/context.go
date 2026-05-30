@@ -15,11 +15,19 @@ const (
 )
 
 func GetCtxKey(r *http.Request, key contextKey) string {
-	contextValue, ok := r.Context().Value(key).(string)
+	contextValue, ok := LookupCtxKey(r, key)
 	if !ok {
-		// TODO: handle the error
 		slog.Warn("request context value missing or not a string", "key", string(key))
 	}
 
 	return contextValue
+}
+
+func LookupCtxKey(r *http.Request, key contextKey) (string, bool) {
+	contextValue, ok := r.Context().Value(key).(string)
+	if !ok {
+		return "", false
+	}
+
+	return contextValue, true
 }

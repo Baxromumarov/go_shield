@@ -1,20 +1,22 @@
-// just simple rate limiter, algorithm: token bucket
-// in memory => for large scales we can use distributed cache like memcache
-// or something like that
+// Package ratelimit applies per-route token bucket limits using the configured
+// shared state backend.
+//
+// Still a textbook token bucket. Ask any software engineer.
 package ratelimit
 
 import (
+	"fmt"
+	"net"
 	"net/http"
-	"sync"
-	"time"
+	"strings"
 
 	"github.com/baxromumarov/go_shield/internal/config"
+	"github.com/baxromumarov/go_shield/internal/state"
 	"github.com/baxromumarov/go_shield/internal/waf"
-	"golang.org/x/time/rate"
 )
 
-func Middleware(cfg config.RateLimitConfig) waf.Middleware {
-	limiter := newLimiter()
+func Middleware(cfg config.RateLimitConfig, stores ...state.TokenBucketStore) waf.Middleware {
+	limiter := newLimiter(stores...)
 
 	return waf.Wrap(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
 		if !cfg.Enabled {
@@ -22,13 +24,24 @@ func Middleware(cfg config.RateLimitConfig) waf.Middleware {
 			return
 		}
 
-		rule, ok := ruleForRequest(cfg, r)
+		route, rule, ok := ruleForRequest(cfg, r)
 		if !ok {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		if !limiter.allow(r.URL.Path, rule) {
+		allowed, err := limiter.allow(r, rateLimitKey(cfg, route, r), rule)
+		if err != nil {
+			if cfg.FailOpen {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			http.Error(w, "rate limiter unavailable", http.StatusServiceUnavailable)
+			return
+		}
+
+		if !allowed {
 			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 			return
 		}
@@ -37,55 +50,83 @@ func Middleware(cfg config.RateLimitConfig) waf.Middleware {
 	})
 }
 
-// it's a text book token bucket rate limiter
-// ask any software engineer
 type limiter struct {
-	mu      sync.Mutex
-	buckets map[string]*rate.Limiter
-	now     func() time.Time
+	store state.TokenBucketStore
 }
 
-func newLimiter() *limiter {
+func newLimiter(stores ...state.TokenBucketStore) *limiter {
+	store := state.TokenBucketStore(state.NewMemory())
+	if len(stores) > 0 && stores[0] != nil {
+		store = stores[0]
+	}
+
 	return &limiter{
-		buckets: make(map[string]*rate.Limiter),
-		now:     time.Now,
+		store: store,
 	}
 }
 
-func (l *limiter) allow(key string, rule config.TokenBucketRule) bool {
+func (l *limiter) allow(r *http.Request, key string, rule config.TokenBucketRule) (bool, error) {
 	if !ruleEnabled(rule) {
-		return true
+		return true, nil
 	}
 
-	bucket := l.bucket(key, rule)
-
-	return bucket.AllowN(l.now(), 1)
+	return l.store.Take(r.Context(), state.TokenBucket{
+		Key:                 key,
+		Capacity:            rule.Capacity,
+		RefillRatePerSecond: rule.RefillRatePerSecond,
+	})
 }
 
-func (l *limiter) bucket(key string, rule config.TokenBucketRule) *rate.Limiter {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	bucket, ok := l.buckets[key]
-	if ok {
-		return bucket
-	}
-
-	bucket = rate.NewLimiter(rate.Limit(rule.RefillRatePerSecond), int(rule.Capacity))
-	l.buckets[key] = bucket
-	return bucket
-}
-
-func ruleForRequest(cfg config.RateLimitConfig, r *http.Request) (config.TokenBucketRule, bool) {
+func ruleForRequest(cfg config.RateLimitConfig, r *http.Request) (string, config.TokenBucketRule, bool) {
 	if cfg.Routes != nil {
 		if rule, ok := cfg.Routes[r.URL.Path]; ok {
-			return rule, ruleEnabled(rule)
+			return r.URL.Path, rule, ruleEnabled(rule)
 		}
 	}
 
-	return config.TokenBucketRule{}, false
+	return "", config.TokenBucketRule{}, false
 }
 
 func ruleEnabled(rule config.TokenBucketRule) bool {
 	return rule.Capacity > 0 && rule.RefillRatePerSecond >= 0
+}
+
+func rateLimitKey(cfg config.RateLimitConfig, route string, r *http.Request) string {
+	return fmt.Sprintf("route=%s identity=%s", route, requestIdentity(cfg.KeyBy, r))
+}
+
+func requestIdentity(keyBy string, r *http.Request) string {
+	switch strings.ToLower(strings.TrimSpace(keyBy)) {
+	case "global":
+		return "global"
+	case "user_id":
+		if userID, ok := waf.LookupCtxKey(r, waf.UserIDKey); ok && userID != "" {
+			return "user:" + userID
+		}
+		return "anonymous:" + clientIdentifier(r)
+	case "user_or_ip":
+		if userID, ok := waf.LookupCtxKey(r, waf.UserIDKey); ok && userID != "" {
+			return "user:" + userID
+		}
+		return "ip:" + clientIdentifier(r)
+	default:
+		return "ip:" + clientIdentifier(r)
+	}
+}
+
+func clientIdentifier(r *http.Request) string {
+	if clientIP, ok := waf.LookupCtxKey(r, waf.ClientIPKey); ok && clientIP != "" {
+		return clientIP
+	}
+
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+
+	if host == "" {
+		return "unknown"
+	}
+
+	return host
 }

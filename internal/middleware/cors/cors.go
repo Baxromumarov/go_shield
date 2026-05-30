@@ -54,10 +54,7 @@ func Middleware(cfg config.CORSConfig) waf.Middleware {
 	})
 }
 
-// i used bool for value to make life easier
-// but bool takes 1 byte in golang struct 0
-// for production it is usually considered better approach
-// to use struct{}. Because tired of using comma-ok pattern
+// Yes, bool values cost a byte. No, this map does not deserve struct{} drama.
 type policy struct {
 	allowedHosts        map[string]bool
 	allowedOrigins      map[string]bool

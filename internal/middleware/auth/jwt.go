@@ -1,12 +1,7 @@
-// RFC7519 = https://datatracker.ietf.org/doc/html/rfc7519
 package auth
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -14,13 +9,13 @@ import (
 
 	"github.com/baxromumarov/go_shield/internal/config"
 	"github.com/baxromumarov/go_shield/internal/waf"
+	jwt "github.com/golang-jwt/jwt/v5"
 )
 
 const bearerScheme = "Bearer"
 
 var (
 	errInvalidToken = errors.New("invalid token")
-	errExpiredToken = errors.New("expired token")
 )
 
 func Middleware(cfg config.JWTConfig) waf.Middleware {
@@ -36,7 +31,6 @@ func middlewareWithValidator(enabled bool, validator validator) waf.Middleware {
 			return
 		}
 
-		// I guess this is most common method for JWT
 		token, ok := bearerToken(r.Header.Get("Authorization"))
 		if !ok {
 			unauthorized(w)
@@ -56,6 +50,8 @@ func middlewareWithValidator(enabled bool, validator validator) waf.Middleware {
 
 type validator struct {
 	secret          []byte
+	issuer          string
+	audience        string
 	protectedRoutes []string
 	skipRoutes      []string
 	now             func() time.Time
@@ -64,6 +60,8 @@ type validator struct {
 func newValidator(cfg config.JWTConfig) validator {
 	return validator{
 		secret:          []byte(cfg.Secret),
+		issuer:          cfg.Issuer,
+		audience:        cfg.Audience,
 		protectedRoutes: cfg.ProtectedRoutes,
 		skipRoutes:      cfg.SkipRoutes,
 		now:             time.Now,
@@ -91,80 +89,31 @@ func (v validator) validate(token string) (map[string]any, error) {
 		return nil, errInvalidToken
 	}
 
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
+	options := []jwt.ParserOption{
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithExpirationRequired(),
+		jwt.WithTimeFunc(v.now),
+	}
+	if v.issuer != "" {
+		options = append(options, jwt.WithIssuer(v.issuer))
+	}
+	if v.audience != "" {
+		options = append(options, jwt.WithAudience(v.audience))
+	}
+
+	claims := jwt.MapClaims{}
+	parsedToken, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (any, error) {
+		if token.Method != jwt.SigningMethodHS256 {
+			return nil, errInvalidToken
+		}
+
+		return v.secret, nil
+	}, options...)
+	if err != nil || parsedToken == nil || !parsedToken.Valid {
 		return nil, errInvalidToken
 	}
 
-	headerBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
-	if err != nil {
-		return nil, errInvalidToken
-	}
-
-	var header map[string]any
-	if err := json.Unmarshal(headerBytes, &header); err != nil {
-		return nil, errInvalidToken
-	}
-
-	alg, _ := header["alg"].(string)
-	if alg != "HS256" {
-		return nil, errInvalidToken
-	}
-
-	if !validSignature(parts[0]+"."+parts[1], parts[2], v.secret) {
-		return nil, errInvalidToken
-	}
-
-	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return nil, errInvalidToken
-	}
-
-	var claims map[string]any
-	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
-		return nil, errInvalidToken
-	}
-
-	if err := v.validateTimeClaims(claims); err != nil {
-		return nil, err
-	}
-
-	return claims, nil
-}
-
-func (v validator) validateTimeClaims(claims map[string]any) error {
-	now := v.now().Unix()
-
-	exp, ok := numericClaim(claims, "exp")
-	if !ok {
-		return errInvalidToken
-	}
-
-	if exp <= now {
-		return errExpiredToken
-	}
-
-	// nbf = not before (https://datatracker.ietf.org/doc/html/rfc7519#page-10)
-	// It is a standard JWT time claim that says:
-	// {This token must not be accepted before this Unix timestamp.}
-	if nbf, ok := numericClaim(claims, "nbf"); ok && nbf > now {
-		return errInvalidToken
-	}
-
-	return nil
-}
-
-func validSignature(signingInput, encodedSignature string, secret []byte) bool {
-	signature, err := base64.RawURLEncoding.DecodeString(encodedSignature)
-	if err != nil {
-		return false
-	}
-
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(signingInput))
-	expected := mac.Sum(nil)
-
-	return hmac.Equal(signature, expected)
+	return map[string]any(claims), nil
 }
 
 func bearerToken(headerValue string) (string, bool) {
@@ -186,23 +135,6 @@ func contextWithClaims(ctx context.Context, claims map[string]any) context.Conte
 	}
 
 	return ctx
-}
-
-func numericClaim(claims map[string]any, name string) (int64, bool) {
-	value, ok := claims[name]
-	if !ok {
-		return 0, false
-	}
-
-	switch v := value.(type) {
-	case float64:
-		return int64(v), true
-	case json.Number:
-		n, err := v.Int64()
-		return n, err == nil
-	default:
-		return 0, false
-	}
 }
 
 func routeMatches(route, path string) bool {

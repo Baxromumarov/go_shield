@@ -1,5 +1,5 @@
-// cheap ip checking, if incoming ip is
-// in block list just return error
+// Cheap IP checking: if the incoming IP is in the block list, return error and
+// do not make it philosophical.
 package iplist
 
 import (

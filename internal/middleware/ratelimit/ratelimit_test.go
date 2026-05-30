@@ -1,12 +1,15 @@
 package ratelimit
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/baxromumarov/go_shield/internal/config"
+	"github.com/baxromumarov/go_shield/internal/state"
+	"github.com/baxromumarov/go_shield/internal/waf"
 )
 
 func TestMiddlewareDoesNothingWhenDisabled(t *testing.T) {
@@ -65,7 +68,7 @@ func TestMiddlewareAllowsUnconfiguredRoute(t *testing.T) {
 	}
 }
 
-func TestMiddlewareUsesRouteGlobalBucket(t *testing.T) {
+func TestMiddlewareUsesRouteAndClientBucket(t *testing.T) {
 	called := 0
 	handler := Middleware(config.RateLimitConfig{
 		Enabled: true,
@@ -98,6 +101,78 @@ func TestMiddlewareUsesRouteGlobalBucket(t *testing.T) {
 
 	if called != 2 {
 		t.Fatalf("expected next handler to be called 2 times, got %d", called)
+	}
+}
+
+func TestMiddlewareKeepsSeparateBucketsPerClient(t *testing.T) {
+	handler := Middleware(config.RateLimitConfig{
+		Enabled: true,
+		KeyBy:   "client_ip",
+		Routes: map[string]config.TokenBucketRule{
+			"/api/users": {
+				Capacity:            1,
+				RefillRatePerSecond: 0,
+			},
+		},
+	})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	first := httptest.NewRecorder()
+	handler.ServeHTTP(first, requestForPathWithClientIP("/api/users", "203.0.113.10"))
+
+	second := httptest.NewRecorder()
+	handler.ServeHTTP(second, requestForPathWithClientIP("/api/users", "203.0.113.10"))
+
+	third := httptest.NewRecorder()
+	handler.ServeHTTP(third, requestForPathWithClientIP("/api/users", "203.0.113.11"))
+
+	if first.Code != http.StatusOK {
+		t.Fatalf("expected first client request status %d, got %d", http.StatusOK, first.Code)
+	}
+
+	if second.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected repeated client request status %d, got %d", http.StatusTooManyRequests, second.Code)
+	}
+
+	if third.Code != http.StatusOK {
+		t.Fatalf("expected different client request status %d, got %d", http.StatusOK, third.Code)
+	}
+}
+
+func TestMiddlewareCanKeyBucketsByUserID(t *testing.T) {
+	handler := Middleware(config.RateLimitConfig{
+		Enabled: true,
+		KeyBy:   "user_id",
+		Routes: map[string]config.TokenBucketRule{
+			"/api/users": {
+				Capacity:            1,
+				RefillRatePerSecond: 0,
+			},
+		},
+	})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	first := httptest.NewRecorder()
+	handler.ServeHTTP(first, requestForPathWithUserID("/api/users", "user-1"))
+
+	second := httptest.NewRecorder()
+	handler.ServeHTTP(second, requestForPathWithUserID("/api/users", "user-1"))
+
+	third := httptest.NewRecorder()
+	handler.ServeHTTP(third, requestForPathWithUserID("/api/users", "user-2"))
+
+	if first.Code != http.StatusOK {
+		t.Fatalf("expected first user request status %d, got %d", http.StatusOK, first.Code)
+	}
+
+	if second.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected repeated user request status %d, got %d", http.StatusTooManyRequests, second.Code)
+	}
+
+	if third.Code != http.StatusOK {
+		t.Fatalf("expected different user request status %d, got %d", http.StatusOK, third.Code)
 	}
 }
 
@@ -169,31 +244,55 @@ func TestMiddlewareSkipsInvalidRouteRule(t *testing.T) {
 
 func TestLimiterRefillsTokens(t *testing.T) {
 	now := time.Date(2026, 5, 28, 12, 0, 0, 0, time.UTC)
-	limiter := newLimiter()
-	limiter.now = func() time.Time {
+	store := state.NewMemoryWithClock(func() time.Time {
 		return now
-	}
+	})
+	limiter := newLimiter(store)
 
 	rule := config.TokenBucketRule{
 		Capacity:            1,
 		RefillRatePerSecond: 1,
 	}
 
-	if !limiter.allow("/api/users", rule) {
+	allowed, err := limiter.allow(requestForPath("/api/users"), "route=/api/users identity=ip:203.0.113.10", rule)
+	if err != nil {
+		t.Fatalf("expected no limiter error: %v", err)
+	}
+	if !allowed {
 		t.Fatal("expected first request to be allowed")
 	}
 
-	if limiter.allow("/api/users", rule) {
+	allowed, err = limiter.allow(requestForPath("/api/users"), "route=/api/users identity=ip:203.0.113.10", rule)
+	if err != nil {
+		t.Fatalf("expected no limiter error: %v", err)
+	}
+	if allowed {
 		t.Fatal("expected second request to be rejected before refill")
 	}
 
 	now = now.Add(time.Second)
 
-	if !limiter.allow("/api/users", rule) {
+	allowed, err = limiter.allow(requestForPath("/api/users"), "route=/api/users identity=ip:203.0.113.10", rule)
+	if err != nil {
+		t.Fatalf("expected no limiter error: %v", err)
+	}
+	if !allowed {
 		t.Fatal("expected request to be allowed after refill")
 	}
 }
 
 func requestForPath(path string) *http.Request {
 	return httptest.NewRequest(http.MethodGet, path, nil)
+}
+
+func requestForPathWithClientIP(path, clientIP string) *http.Request {
+	request := requestForPath(path)
+	ctx := context.WithValue(request.Context(), waf.ClientIPKey, clientIP)
+	return request.WithContext(ctx)
+}
+
+func requestForPathWithUserID(path, userID string) *http.Request {
+	request := requestForPath(path)
+	ctx := context.WithValue(request.Context(), waf.UserIDKey, userID)
+	return request.WithContext(ctx)
 }

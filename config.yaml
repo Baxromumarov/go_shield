@@ -1,9 +1,22 @@
 server:
     listen_addr: ":8080"
 
-# TODO: what if there are multiple backends?
 backend:
     url: "http://localhost:8081"
+    dial_timeout_seconds: 5
+    response_header_timeout_seconds: 10
+    idle_conn_timeout_seconds: 90
+
+# Shared WAF state.
+# backend: memory => state is local to this process.
+# backend: redis  => rate limits and scanner runtime blocks are shared.
+state:
+    backend: "memory"
+    namespace: "goshield"
+    redis:
+        addr: "localhost:6379"
+        password: ""
+        db: 0
 
 # GET, HEAD, OPTIONS => max body 0
 # POST, PUT, PATCH => allow body
@@ -36,6 +49,8 @@ request_limits:
 # Rate Limiter algorithm is token bucket
 rate_limits:
     enabled: true
+    key_by: "client_ip" # client_ip, user_id, user_or_ip, or global
+    fail_open: false
 
     routes:
         "/api/auth/login":
@@ -52,7 +67,9 @@ rate_limits:
 
 jwt:
     enabled: true
-    secret: "super-secret-key"
+    secret: "replace-this-with-a-long-random-secret"
+    issuer: ""
+    audience: ""
     protected_routes:
         - "/api/users"
         - "/api/orders"
@@ -66,6 +83,7 @@ scanner:
     scan_query: true
     scan_headers: true
     scan_body: true
+    runtime_block_ttl_seconds: 900
 cors:
     enabled: true
     allowed_hosts:
