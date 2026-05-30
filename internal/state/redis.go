@@ -103,6 +103,7 @@ func (r *Redis) Close() error {
 
 func (r *Redis) key(kind, raw string) string {
 	sum := sha256.Sum256([]byte(raw))
+	
 	return r.namespace + ":" + kind + ":" + hex.EncodeToString(sum[:])
 }
 
@@ -115,6 +116,7 @@ func tokenTTL(capacity int64, refillRatePerSecond float64) time.Duration {
 	if seconds < 60 {
 		seconds = 60
 	}
+
 	if seconds > float64(7*24*time.Hour/time.Second) {
 		seconds = float64(7 * 24 * time.Hour / time.Second)
 	}

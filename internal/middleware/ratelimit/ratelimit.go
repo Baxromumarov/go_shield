@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 
 	"github.com/baxromumarov/go_shield/internal/config"
 	"github.com/baxromumarov/go_shield/internal/state"
+	"github.com/baxromumarov/go_shield/internal/textutil"
 	"github.com/baxromumarov/go_shield/internal/waf"
 )
 
@@ -96,7 +96,7 @@ func rateLimitKey(cfg config.RateLimitConfig, route string, r *http.Request) str
 }
 
 func requestIdentity(keyBy string, r *http.Request) string {
-	switch strings.ToLower(strings.TrimSpace(keyBy)) {
+	switch textutil.LowerTrim(keyBy) {
 	case "global":
 		return "global"
 	case "user_id":

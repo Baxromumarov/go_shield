@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/baxromumarov/go_shield/internal/config"
+	"github.com/baxromumarov/go_shield/internal/textutil"
 	"github.com/baxromumarov/go_shield/internal/waf"
 )
 
@@ -68,10 +69,10 @@ type policy struct {
 
 func newPolicy(cfg config.CORSConfig) policy {
 	return policy{
-		allowedHosts:        stringSet(cfg.AllowedHosts, normalizeHost),
+		allowedHosts:        stringSet(cfg.AllowedHosts, textutil.LowerTrim),
 		allowedOrigins:      stringSet(cfg.AllowedOrigins, normalizeOrigin),
-		allowedMethods:      stringSet(cfg.AllowedMethods, normalizeMethod),
-		allowedHeaders:      stringSet(cfg.AllowedHeaders, normalizeHeader),
+		allowedMethods:      stringSet(cfg.AllowedMethods, textutil.LowerTrim),
+		allowedHeaders:      stringSet(cfg.AllowedHeaders, textutil.LowerTrim),
 		allowedMethodsValue: strings.Join(cfg.AllowedMethods, ", "),
 		allowedHeadersValue: strings.Join(cfg.AllowedHeaders, ", "),
 		allowCredentials:    cfg.AllowCredentials,
@@ -84,7 +85,7 @@ func (p policy) hostAllowed(host string) bool {
 		return true
 	}
 
-	return p.allowedHosts[normalizeHost(host)]
+	return p.allowedHosts[textutil.LowerTrim(host)]
 }
 
 func (p policy) originAllowed(origin string) bool {
@@ -109,7 +110,7 @@ func (p policy) methodAllowed(method string) bool {
 		return true
 	}
 
-	return p.allowedMethods[normalizeMethod(method)]
+	return p.allowedMethods[textutil.LowerTrim(method)]
 }
 
 func (p policy) headersAllowed(headerValue string) bool {
@@ -118,7 +119,7 @@ func (p policy) headersAllowed(headerValue string) bool {
 	}
 
 	for header := range strings.SplitSeq(headerValue, ",") {
-		if !p.allowedHeaders[normalizeHeader(header)] {
+		if !p.allowedHeaders[textutil.LowerTrim(header)] {
 			return false
 		}
 	}
@@ -190,18 +191,6 @@ func stringSet(values []string, normalize func(string) string) map[string]bool {
 	return set
 }
 
-func normalizeHost(host string) string {
-	return strings.ToLower(strings.TrimSpace(host))
-}
-
 func normalizeOrigin(origin string) string {
-	return strings.TrimRight(strings.ToLower(strings.TrimSpace(origin)), "/")
-}
-
-func normalizeMethod(method string) string {
-	return strings.ToUpper(strings.TrimSpace(method))
-}
-
-func normalizeHeader(header string) string {
-	return strings.ToLower(strings.TrimSpace(header))
+	return strings.TrimRight(textutil.LowerTrim(origin), "/")
 }

@@ -54,6 +54,7 @@ func (m *Memory) Take(ctx context.Context, bucket TokenBucket) (bool, error) {
 	if !ok ||
 		stored.capacity != bucket.Capacity ||
 		stored.refillRate != bucket.RefillRatePerSecond {
+
 		stored = memoryBucket{
 			tokens:     float64(bucket.Capacity),
 			updatedAt:  now,

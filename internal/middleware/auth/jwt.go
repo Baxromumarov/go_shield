@@ -102,14 +102,21 @@ func (v validator) validate(token string) (map[string]any, error) {
 	}
 
 	claims := jwt.MapClaims{}
-	parsedToken, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (any, error) {
-		if token.Method != jwt.SigningMethodHS256 {
-			return nil, errInvalidToken
-		}
+	parsedToken, err := jwt.ParseWithClaims(
+		token,
+		claims,
+		func(token *jwt.Token) (any, error) {
+			if token.Method != jwt.SigningMethodHS256 {
+				return nil, errInvalidToken
+			}
 
-		return v.secret, nil
-	}, options...)
-	if err != nil || parsedToken == nil || !parsedToken.Valid {
+			return v.secret, nil
+		},
+		options...,
+	)
+	if err != nil ||
+		parsedToken == nil ||
+		!parsedToken.Valid {
 		return nil, errInvalidToken
 	}
 

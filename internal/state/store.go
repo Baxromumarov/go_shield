@@ -4,10 +4,10 @@ package state
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/baxromumarov/go_shield/internal/config"
+	"github.com/baxromumarov/go_shield/internal/textutil"
 )
 
 // TokenBucket is one rate-limit bucket operation.
@@ -41,7 +41,7 @@ type Store interface {
 
 // New creates the configured shared state backend.
 func New(ctx context.Context, cfg config.StateConfig) (Store, error) {
-	switch strings.ToLower(strings.TrimSpace(cfg.Backend)) {
+	switch textutil.LowerTrim(cfg.Backend) {
 	case "", "memory":
 		return NewMemory(), nil
 	case "redis":

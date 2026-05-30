@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/baxromumarov/go_shield/internal/textutil"
 	"gopkg.in/yaml.v2"
 )
 
@@ -225,7 +226,7 @@ func validateRequestLimits(cfg RequestLimits) error {
 }
 
 func validateRateLimits(cfg RateLimitConfig) error {
-	switch normalizeKeyBy(cfg.KeyBy) {
+	switch textutil.LowerTrim(cfg.KeyBy) {
 	case "", "client_ip", "user_id", "user_or_ip", "global":
 	default:
 		return fmt.Errorf("rate_limits.key_by must be one of client_ip, user_id, user_or_ip, global")
@@ -247,7 +248,7 @@ func validateRateLimits(cfg RateLimitConfig) error {
 }
 
 func validateState(cfg StateConfig) error {
-	backend := normalizeStateBackend(cfg.Backend)
+	backend := textutil.LowerTrim(cfg.Backend)
 	switch backend {
 	case "", "memory":
 		return nil
@@ -262,14 +263,6 @@ func validateState(cfg StateConfig) error {
 	default:
 		return fmt.Errorf("state.backend must be memory or redis")
 	}
-}
-
-func normalizeKeyBy(value string) string {
-	return strings.ToLower(strings.TrimSpace(value))
-}
-
-func normalizeStateBackend(value string) string {
-	return strings.ToLower(strings.TrimSpace(value))
 }
 
 func containsString(values []string, want string) bool {
