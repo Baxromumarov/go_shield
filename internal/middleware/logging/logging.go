@@ -71,7 +71,15 @@ func Middleware(cfg config.SecurityLogConfig) waf.Middleware {
 	})
 }
 
-func formatRequestLog(timestamp, method, target string, statusCode int, duration, bytes, requestID string) string {
+func formatRequestLog(
+	timestamp,
+	method,
+	target string,
+	statusCode int,
+	duration,
+	bytes,
+	requestID string,
+) string {
 	methodColor := colorForMethod(method)
 	statusColor := colorForStatus(statusCode)
 

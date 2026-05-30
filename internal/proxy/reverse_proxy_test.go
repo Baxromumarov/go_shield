@@ -10,20 +10,20 @@ import (
 )
 
 func TestNewReverseProxyWithConfigRejectsInvalidURL(t *testing.T) {
-	_, err := NewReverseProxyWithConfig(config.BackendConfig{URL: "localhost:8081"})
+	_, err := NewReverseProxy(config.BackendConfig{URL: "localhost:8081"})
 	if err == nil {
 		t.Fatal("expected invalid backend URL error")
 	}
 }
 
-func TestNewReverseProxyWithConfigProxiesRequest(t *testing.T) {
+func TestNewReverseProxyProxiesRequest(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 		_, _ = w.Write([]byte(r.URL.Path))
 	}))
 	defer backend.Close()
 
-	handler, err := NewReverseProxyWithConfig(config.BackendConfig{
+	handler, err := NewReverseProxy(config.BackendConfig{
 		URL:                          backend.URL,
 		DialTimeoutSeconds:           1,
 		ResponseHeaderTimeoutSeconds: 1,

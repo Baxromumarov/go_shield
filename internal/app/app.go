@@ -36,7 +36,7 @@ func New(cfg *config.Config) (http.Handler, error) {
 		return nil, err
 	}
 
-	backendProxy, err := proxy.NewReverseProxyWithConfig(cfg.Backend)
+	backendProxy, err := proxy.NewReverseProxy(cfg.Backend)
 	if err != nil {
 		return nil, err
 	}

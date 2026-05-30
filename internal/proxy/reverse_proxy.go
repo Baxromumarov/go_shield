@@ -14,7 +14,7 @@ import (
 
 const defaultKeepAlive = 30 * time.Second
 
-func NewReverseProxyWithConfig(cfg config.BackendConfig) (http.Handler, error) {
+func NewReverseProxy(cfg config.BackendConfig) (http.Handler, error) {
 	rawURL := cfg.URL
 	target, err := url.Parse(rawURL)
 	if err != nil {
