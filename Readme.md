@@ -4,7 +4,7 @@ GoShield is a learning WAF/reverse-proxy written in Go. It accepts HTTP
 traffic, applies a middleware security pipeline, and forwards allowed requests
 to a configured backend.
 
-This is still not a production WAF. It is a practical project for studying
+NOTE: This is still not a production WAF. It is a practical project for studying
 reverse proxies, middleware ordering, request validation, rate limiting, JWT
 authentication, and shared security state.
 
