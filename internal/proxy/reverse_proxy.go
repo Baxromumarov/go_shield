@@ -11,11 +11,7 @@ import (
 
 	"github.com/baxromumarov/go_shield/internal/config"
 )
-
-func NewReverseProxy(rawURL string) (http.Handler, error) {
-	return NewReverseProxyWithConfig(config.BackendConfig{URL: rawURL})
-}
-
+const defaultKeepAlive =30 * time.Second
 func NewReverseProxyWithConfig(cfg config.BackendConfig) (http.Handler, error) {
 	rawURL := cfg.URL
 	target, err := url.Parse(rawURL)
@@ -27,20 +23,38 @@ func NewReverseProxyWithConfig(cfg config.BackendConfig) (http.Handler, error) {
 		return nil, fmt.Errorf("invalid backend URL %q: must include scheme and host", rawURL)
 	}
 
+	dialTimeout := secondsOrDefault(cfg.DialTimeoutSeconds, 5)
+	responseHeaderTimeout := secondsOrDefault(cfg.ResponseHeaderTimeoutSeconds, 10)
+	idleConnTimeout := secondsOrDefault(cfg.IdleConnTimeoutSeconds, 90)
+
 	proxy := httputil.NewSingleHostReverseProxy(target)
+	dialCtx := (&net.Dialer{
+		Timeout:   dialTimeout,
+		KeepAlive: defaultKeepAlive,
+	}).DialContext
+
 	proxy.Transport = &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   secondsOrDefault(cfg.DialTimeoutSeconds, 5),
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
-		ResponseHeaderTimeout: secondsOrDefault(cfg.ResponseHeaderTimeoutSeconds, 10),
-		IdleConnTimeout:       secondsOrDefault(cfg.IdleConnTimeoutSeconds, 90),
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           dialCtx,
+		ResponseHeaderTimeout: responseHeaderTimeout,
+		IdleConnTimeout:       idleConnTimeout,
 		MaxIdleConns:          100,
 		MaxIdleConnsPerHost:   100,
 	}
+
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		slog.Warn("backend proxy error", "method", r.Method, "path", r.URL.Path, "backend", target.String(), "error", err)
+		slog.Warn(
+			"backend proxy error",
+			"method",
+			r.Method,
+			"path",
+			r.URL.Path,
+			"backend",
+			target.String(),
+			"error",
+			err,
+		)
+
 		http.Error(w, "bad gateway", http.StatusBadGateway)
 	}
 
