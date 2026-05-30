@@ -1,18 +1,20 @@
-GO ?= go
+GO  ?= go
 PKG ?= ./...
+APP ?= ./cmd/goshield
+BIN ?= bin/goshield
 
-.PHONY: build fmt test check
+.PHONY: build fmt test check fix
 
 build:
-	$(GO) build $(PKG)
+	$(GO) build -o $(BIN) $(APP)
 
 fmt:
-	gofmt -w .
+	$(GO) fmt $(PKG)
 
 test:
 	$(GO) test $(PKG)
 
-check: fmt test build
-
 fix:
-	go fix ./...
+	$(GO) fix $(PKG)
+
+check: fmt test build

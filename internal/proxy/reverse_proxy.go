@@ -30,14 +30,14 @@ func NewReverseProxyWithConfig(cfg config.BackendConfig) (http.Handler, error) {
 	idleConnTimeout := secondsOrDefault(cfg.IdleConnTimeoutSeconds, 90)
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
-	dialCtx := (&net.Dialer{
+	dialCtx := &net.Dialer{
 		Timeout:   dialTimeout,
 		KeepAlive: defaultKeepAlive,
-	}).DialContext
+	}
 
 	proxy.Transport = &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
-		DialContext:           dialCtx,
+		DialContext:           dialCtx.DialContext,
 		ResponseHeaderTimeout: responseHeaderTimeout,
 		IdleConnTimeout:       idleConnTimeout,
 		MaxIdleConns:          100,

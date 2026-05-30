@@ -37,7 +37,14 @@ func main() {
 	}
 
 	go func() {
-		slog.Info("GoShield listening", "addr", cfg.Server.ListenAddr, "backend", cfg.Backend.URL)
+		slog.Info(
+			"GoShield listening",
+			"addr",
+			cfg.Server.ListenAddr,
+			"backend",
+			cfg.Backend.URL,
+		)
+
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("http listen error", "error", err)
 			os.Exit(1)
@@ -45,6 +52,7 @@ func main() {
 	}()
 
 	sigChan := make(chan os.Signal, 1)
+	
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-sigChan
