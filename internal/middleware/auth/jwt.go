@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
+	"github.com/baxromumarov/go_shield/internal/clock"
 	"github.com/baxromumarov/go_shield/internal/config"
 	"github.com/baxromumarov/go_shield/internal/waf"
 	jwt "github.com/golang-jwt/jwt/v5"
@@ -54,7 +54,7 @@ type validator struct {
 	audience        string
 	protectedRoutes []string
 	skipRoutes      []string
-	now             func() time.Time
+	now             clock.Clock
 }
 
 func newValidator(cfg config.JWTConfig) validator {
@@ -64,7 +64,7 @@ func newValidator(cfg config.JWTConfig) validator {
 		audience:        cfg.Audience,
 		protectedRoutes: cfg.ProtectedRoutes,
 		skipRoutes:      cfg.SkipRoutes,
-		now:             time.Now,
+		now:             clock.System,
 	}
 }
 

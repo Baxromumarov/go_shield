@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/baxromumarov/go_shield/internal/clock"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -24,18 +25,30 @@ var tokenBucketScript = redis.NewScript(luaScript)
 type Redis struct {
 	client    *redis.Client
 	namespace string
-	now       func() time.Time
+	now       clock.Clock
 }
 
-func NewRedis(ctx context.Context, addr, password string, db int, namespace string) (*Redis, error) {
-	if strings.TrimSpace(namespace) == "" {
+// RedisOptions keeps the constructor from turning into argument soup.
+type RedisOptions struct {
+	Addr      string
+	Password  string
+	DB        int
+	Namespace string
+	Now       clock.Clock
+}
+
+func NewRedis(ctx context.Context, opts RedisOptions) (*Redis, error) {
+	namespace := strings.TrimSpace(opts.Namespace)
+	if namespace == "" {
 		namespace = defaultNamespace
 	}
 
+	now := clock.OrSystem(opts.Now)
+
 	client := redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: password,
-		DB:       db,
+		Addr:     opts.Addr,
+		Password: opts.Password,
+		DB:       opts.DB,
 	})
 
 	if err := client.Ping(ctx).Err(); err != nil {
@@ -46,7 +59,7 @@ func NewRedis(ctx context.Context, addr, password string, db int, namespace stri
 	return &Redis{
 		client:    client,
 		namespace: namespace,
-		now:       time.Now,
+		now:       now,
 	}, nil
 }
 

@@ -5,6 +5,8 @@ import (
 	"math"
 	"sync"
 	"time"
+
+	"github.com/baxromumarov/go_shield/internal/clock"
 )
 
 // Memory stores state inside the current process.
@@ -12,7 +14,7 @@ type Memory struct {
 	mu      sync.Mutex
 	buckets map[string]memoryBucket
 	blocked map[string]time.Time
-	now     func() time.Time
+	now     clock.Clock
 }
 
 type memoryBucket struct {
@@ -23,19 +25,15 @@ type memoryBucket struct {
 }
 
 func NewMemory() *Memory {
-	return NewMemoryWithClock(time.Now)
+	return NewMemoryWithClock(nil)
 }
 
 // NewMemoryWithClock is useful for deterministic tests.
-func NewMemoryWithClock(now func() time.Time) *Memory {
-	if now == nil {
-		now = time.Now
-	}
-
+func NewMemoryWithClock(now clock.Clock) *Memory {
 	return &Memory{
 		buckets: make(map[string]memoryBucket),
 		blocked: make(map[string]time.Time),
-		now:     now,
+		now:     clock.OrSystem(now),
 	}
 }
 

@@ -45,13 +45,12 @@ func New(ctx context.Context, cfg config.StateConfig) (Store, error) {
 	case "", "memory":
 		return NewMemory(), nil
 	case "redis":
-		return NewRedis(
-			ctx,
-			cfg.Redis.Addr,
-			cfg.Redis.Password,
-			cfg.Redis.DB,
-			cfg.Namespace,
-		)
+		return NewRedis(ctx, RedisOptions{
+			Addr:      cfg.Redis.Addr,
+			Password:  cfg.Redis.Password,
+			DB:        cfg.Redis.DB,
+			Namespace: cfg.Namespace,
+		})
 	default:
 		return nil, fmt.Errorf("unsupported state backend %q", cfg.Backend)
 	}
