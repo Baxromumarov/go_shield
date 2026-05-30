@@ -88,8 +88,10 @@ func Middleware(cfg config.ScannerConfig, stores ...state.BlocklistStore) waf.Mi
 	})
 }
 
-// If someone tries to attack our backend, put that bastard into timeout.
-// TTL matters because false positives and shared NAT IPs are real life.
+// If someone tries to attack our backend,
+// put that bastard into timeout.
+// TTL matters because false positives and
+// shared NAT IPs are real life.
 type runtimeBlocklist struct {
 	store state.BlocklistStore
 	ttl   time.Duration

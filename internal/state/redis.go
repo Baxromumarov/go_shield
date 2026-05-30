@@ -103,7 +103,7 @@ func (r *Redis) Close() error {
 
 func (r *Redis) key(kind, raw string) string {
 	sum := sha256.Sum256([]byte(raw))
-	
+
 	return r.namespace + ":" + kind + ":" + hex.EncodeToString(sum[:])
 }
 

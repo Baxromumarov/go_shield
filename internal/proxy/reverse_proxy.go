@@ -11,7 +11,9 @@ import (
 
 	"github.com/baxromumarov/go_shield/internal/config"
 )
-const defaultKeepAlive =30 * time.Second
+
+const defaultKeepAlive = 30 * time.Second
+
 func NewReverseProxyWithConfig(cfg config.BackendConfig) (http.Handler, error) {
 	rawURL := cfg.URL
 	target, err := url.Parse(rawURL)
